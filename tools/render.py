@@ -55,7 +55,7 @@ CHAR_W = 0.6  # conservative average glyph width in em, used for layout and over
 
 # Colour roles: "text" roles need 4.5:1, "line" roles 3:1 against the theme background.
 PALETTE = {
-    # Art's palette (review of PR #2). spawn is not in Art's list and is kept from 50a07ad.
+    # Art's named palette (review of PR #2), including spawn blue.
     "light": {
         "bg": "#ffffff",
         "text": "#0f172a",
@@ -71,7 +71,7 @@ PALETTE = {
         "bg": "#0d1117",
         "text": "#e2e8f0",
         "muted": "#94a3b8",
-        "wall": "#64748b",
+        "wall": "#94a3b8",
         "floor": "#1e293b",
         "dim": "#94a3b8",
         "teal": "#2dd4bf",
