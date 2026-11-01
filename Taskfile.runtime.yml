@@ -11,10 +11,24 @@ tasks:
     desc: Install locked project dependencies
     cmds: [uv sync --locked]
   check:
-    desc: Check formatting and lint
+    desc: Check formatting, lint, generated world docs and manifest coverage
     cmds:
       - uv run --locked --no-sync ruff check .
       - uv run --locked --no-sync ruff format --check .
+      - task: check:docs
+      - task: check:manifest
+  check:docs:
+    desc: Fail if a world README or SVG is missing, lacks a section or is stale
+    cmds:
+      - uv run --locked --no-sync python tools/render.py --check
+  check:manifest:
+    desc: Fail if release.json checksums do not cover every world file
+    cmds:
+      - uv run --locked --no-sync python tools/validate.py
+  render:
+    desc: Regenerate every world SVG, README and release.json from world.json
+    cmds:
+      - uv run --locked --no-sync python tools/render.py
   test:
     desc: Validate worlds and run schema tests with JUnit results
     cmds:

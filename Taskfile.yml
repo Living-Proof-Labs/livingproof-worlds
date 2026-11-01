@@ -12,8 +12,11 @@ tasks:
     desc: Build the development image and install locked dependencies
     cmds: [bash tools/run-task.sh setup]
   check:
-    desc: Check formatting and lint in the development environment
+    desc: Check formatting, lint, world docs and manifests in the development environment
     cmds: [bash tools/run-task.sh check]
+  render:
+    desc: Regenerate every world SVG, README and release.json from world.json
+    cmds: [bash tools/run-task.sh render]
   test:
     desc: Validate every world against the schema and its specification
     cmds: [bash tools/run-task.sh test]
