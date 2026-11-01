@@ -1,0 +1,16 @@
+services:
+  tooling:
+    build:
+      context: .
+      target: development
+      args:
+        APT_MIRROR: "${APT_MIRROR:-}"
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    working_dir: /workspace/worlds
+    volumes:
+      - .:/workspace/worlds
+      - worlds-venv:/opt/worlds-venv
+      - worlds-cache:/opt/worlds-cache
+volumes:
+  worlds-venv:
+  worlds-cache:

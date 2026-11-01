@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Adapted from collaboration-guidelines templates/python/Taskfile.yml.
+version: '3'
+env:
+  UV_PYTHON_DOWNLOADS: never
+tasks:
+  default:
+    desc: Show prepared-environment commands
+    cmds: [task -t Taskfile.runtime.yml --list]
+  setup:
+    desc: Install locked project dependencies
+    cmds: [uv sync --locked]
+  check:
+    desc: Check formatting and lint
+    cmds:
+      - uv run --locked --no-sync ruff check .
+      - uv run --locked --no-sync ruff format --check .
+  test:
+    desc: Validate worlds and run schema tests with JUnit results
+    cmds:
+      - mkdir -p artifacts
+      - uv run --locked --no-sync python tools/validate.py
+      - uv run --locked --no-sync pytest --junitxml=artifacts/tests.xml
+  verify:
+    desc: Check and test
+    cmds:
+      - task: check
+      - task: test

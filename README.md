@@ -24,17 +24,44 @@ This is deliberately not a universal scene language. A world supports only what
 its specification requires, and engine-specific differences are documented.
 Equivalent geometry does not imply identical physics.
 
-## Planned first world
+## Worlds
 
-An open hallway with a named entrance, exit and usable passage, defined by
+| World | Content version | Specification |
+| --- | --- | --- |
+| [`hallway-open`](worlds/hallway-open/0.1.0/world.json) | `0.1.0` | robot-capability-specs v1.3.0 `specs/worlds/hallways.md`, document revision 0.2.0 |
+
+Each world lives at `worlds/<id>/<content_version>/` as `world.json` plus a
+`release.json` manifest. `task test` checks three layers, without running a simulator:
+
+1. **Schema:** [`schema/world.schema.json`](schema/world.schema.json) is closed, so an
+   unknown field, geometry type or place type fails with `UNSUPPORTED` instead
+   of being ignored.
+2. **Semantic geometry:** no overlapping solids, spawns inside the passage and at
+   least 0.25 m from the walls, entrance and exit on the open ends, and dimensions
+   within 0.01 m of the canonical table in a vendored copy of the pinned spec.
+3. **Provenance:** every asset declares a licence, a source and a sha256, and
+   `release.json` ([schema](schema/release.schema.json)) records the id, content
+   version and the sha256 of every file, recomputed on each run. After an
+   intended change in a new version directory, regenerate it with
+   `python tools/validate.py --write-manifest worlds/<id>/<version>`.
+
+The first world is an open hallway with a named entrance, exit and usable passage, defined by
 [robot-capability-specs #18](https://github.com/Living-Proof-Labs/robot-capability-specs/pull/18).
 Both simulators will consume the same pinned release and check floor and wall
 collisions with a simple test object; no robot or controller is involved.
 
+## Development
+
+With Git, Docker Compose v2 and Task 3.54.0 installed: `task setup`, then
+`task check` and `task test` (or `task verify`). Behind a proxy that blocks
+`deb.debian.org`, set `APT_MIRROR` (for example `https://cloudfront.debian.net`)
+before `task setup`. Inside the development container, use
+`task -t Taskfile.runtime.yml verify`.
+
 ## Status
 
-No world data yet. Repository tooling, CI and the first hallway release follow
-the specification.
+`hallway-open` 0.1.0 is described and validated here. No engine conversion,
+adapters, rendered evidence or release exists yet.
 
 ## License
 
