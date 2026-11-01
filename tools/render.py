@@ -55,31 +55,35 @@ CHAR_W = 0.6  # conservative average glyph width in em, used for layout and over
 
 # Colour roles: "text" roles need 4.5:1, "line" roles 3:1 against the theme background.
 PALETTE = {
+    # Art's palette (review of PR #2). spawn is not in Art's list and is kept from 50a07ad.
     "light": {
         "bg": "#ffffff",
-        "text": "#1f2937",
-        "muted": "#4b5563",
-        "wall": "#374151",
-        "floor": "#6b7280",
-        "dim": "#6b7280",
+        "text": "#0f172a",
+        "muted": "#475569",
+        "wall": "#475569",
+        "floor": "#f1f5f9",
+        "dim": "#475569",
         "teal": "#0f766e",
         "amber": "#b45309",
         "spawn": "#1d4ed8",
     },
     "dark": {
         "bg": "#0d1117",
-        "text": "#e6edf3",
-        "muted": "#9ca3af",
-        "wall": "#9ca3af",
-        "floor": "#8b949e",
-        "dim": "#8b949e",
+        "text": "#e2e8f0",
+        "muted": "#94a3b8",
+        "wall": "#64748b",
+        "floor": "#1e293b",
+        "dim": "#94a3b8",
         "teal": "#2dd4bf",
         "amber": "#fbbf24",
         "spawn": "#60a5fa",
     },
 }
 TEXT_ROLES = ["text", "muted", "teal", "amber", "spawn"]
-LINE_ROLES = ["wall", "floor", "dim", "teal", "amber", "spawn"]
+LINE_ROLES = ["wall", "dim", "teal", "amber", "spawn"]
+# The floor is a background fill, not text or a line, so neither 4.5:1 nor 3:1 applies to it
+# against the page. The wall edges carry the boundary, so walls must reach 3:1 against the floor.
+FILL_ROLES = ["floor"]
 
 
 def _vars(theme: str) -> str:
@@ -91,7 +95,7 @@ def _style(mode: str) -> str:
         "text{font-family:" + TEXT_FONT + ";fill:var(--text);font-size:" + f"{FS_LABEL}px" + "}"
         ".title{font-family:" + TITLE_FONT + ";font-size:" + f"{FS_TITLE}px" + "}"
         ".muted{fill:var(--muted)}.dimtext{font-size:" + f"{FS_DIM}px" + ";fill:var(--muted)}"
-        ".wall{fill:var(--wall)}.floor{fill:none;stroke:var(--floor);stroke-width:1}"
+        ".wall{fill:var(--wall)}.floor{fill:var(--floor)}"
         ".passage{fill:var(--teal);fill-opacity:.10;stroke:var(--teal);stroke-dasharray:6 4}"
         ".centre{stroke:var(--teal);stroke-width:1.5;stroke-dasharray:2 4;fill:none}"
         ".entrance{fill:var(--teal)}.exit{stroke:var(--amber);stroke-width:6;stroke-dasharray:10 6}"

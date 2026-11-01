@@ -81,6 +81,7 @@ def test_palette_contrast(theme):
         assert render.contrast(pal[role], pal["bg"]) >= 4.5, role
     for role in render.LINE_ROLES:
         assert render.contrast(pal[role], pal["bg"]) >= 3.0, role
+    assert render.contrast(pal["wall"], pal["floor"]) >= 3.0  # walls stay visible on the floor
     assert pal["bg"] == {"light": "#ffffff", "dark": "#0d1117"}[theme]
 
 
