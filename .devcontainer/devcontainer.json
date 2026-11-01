@@ -1,0 +1,9 @@
+{
+  "name": "Worlds development",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "tooling",
+  "workspaceFolder": "/workspace/worlds",
+  "remoteUser": "vscode",
+  "overrideCommand": true,
+  "postCreateCommand": "task setup"
+}

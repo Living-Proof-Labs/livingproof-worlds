@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+# Adapted from livingproof-sim-mujoco and collaboration-guidelines templates/container/Taskfile.yml.
+version: '3'
+vars:
+  # renovate: guidelines
+  GUIDELINES_VERSION: 'v6.0.4'
+tasks:
+  default:
+    desc: Show available commands
+    cmds: [task --list]
+  setup:
+    desc: Build the development image and install locked dependencies
+    cmds: [bash tools/run-task.sh setup]
+  check:
+    desc: Check formatting and lint in the development environment
+    cmds: [bash tools/run-task.sh check]
+  test:
+    desc: Validate every world against the schema and its specification
+    cmds: [bash tools/run-task.sh test]
+  verify:
+    desc: Check and test in the development environment
+    cmds: [bash tools/run-task.sh verify]
