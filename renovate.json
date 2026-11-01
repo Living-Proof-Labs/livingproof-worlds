@@ -1,4 +1,4 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>Living-Proof-Labs/collaboration-guidelines:renovate-preset#v6.0.4"]
+  "extends": ["github>Living-Proof-Labs/collaboration-guidelines:renovate-preset#v7.0.1"]
 }

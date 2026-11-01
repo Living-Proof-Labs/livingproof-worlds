@@ -76,12 +76,14 @@ def geometry_errors(world: dict) -> list[str]:
                 errors.append(f"INVALID {g['name']}: top must be z = 0, thickness floor_thickness")
             if abs(sy - d["exterior_width"]) > EPS or abs(cy) > EPS:
                 errors.append(f"INVALID {g['name']}: must span the exterior width")
-        else:
+        elif g["role"] == "wall":
             inner = abs(cy) - sy / 2
             if abs(inner - half_w) > EPS or abs(sy - d["wall_thickness"]) > EPS:
                 errors.append(f"INVALID {g['name']}: inner face must be |y| = clear_width/2")
             if abs(cz - sz / 2) > EPS or abs(sz - d["wall_height"]) > EPS:
                 errors.append(f"INVALID {g['name']}: must rise from z = 0 to wall_height")
+        else:
+            errors.append(f"UNSUPPORTED role {g['role']!r} for {g['name']}")
     boxes = world["geometry"]
     for i, a in enumerate(boxes):
         for b in boxes[i + 1 :]:
@@ -104,6 +106,15 @@ def geometry_errors(world: dict) -> list[str]:
             errors.append(f"INVALID {p['name']}: spawn closer than 0.25 m to a wall")
         if p["type"] == "segment" and abs(abs(p["reference"][0]) - half_l) > EPS:
             errors.append(f"INVALID {p['name']}: must lie on an open end x = ±length/2")
+        if p["type"] == "segment":
+            (x0, y0, z0), (x1, y1, z1) = p["points"]
+            rx = p["reference"][0]
+            if abs(x0 - rx) > EPS or abs(x1 - rx) > EPS or abs(z0) > EPS or abs(z1) > EPS:
+                errors.append(f"INVALID {p['name']}: endpoints must lie at x = {rx}, z = 0")
+            if abs(min(y0, y1) + half_w) > EPS or abs(max(y0, y1) - half_w) > EPS:
+                errors.append(f"INVALID {p['name']}: endpoints must span y = ±clear_width/2")
+            if abs(p["reference"][1] - (y0 + y1) / 2) > EPS or abs(p["reference"][2]) > EPS:
+                errors.append(f"INVALID {p['name']}: reference must be the segment midpoint")
     return errors
 
 

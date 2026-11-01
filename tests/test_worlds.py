@@ -290,3 +290,32 @@ def test_declared_asset_file_missing_is_rejected(release):
     (release / "texture.png").unlink()
     validate.write_manifest(release)
     assert "INVALID asset texture.png: file is missing" in errors_for(release)
+
+
+def test_unknown_role_is_rejected_by_schema_and_geometry(world):
+    bad = copy.deepcopy(world)
+    bad["geometry"][1]["role"] = "ceiling"
+    assert "UNSUPPORTED role 'ceiling' for wall-left" in validate.geometry_errors(bad)
+    assert any("geometry/1/role" in e for e in validate.validate(bad))
+
+
+@pytest.mark.parametrize(
+    "change, expected",
+    [
+        (lambda e: e["points"][1].__setitem__(1, 0.5), "endpoints must span y = ±clear_width/2"),
+        (lambda e: e["points"][0].__setitem__(1, -0.9), "endpoints must span y = ±clear_width/2"),
+        (lambda e: e["points"][0].__setitem__(0, -2.9), "endpoints must lie at x = -3.0, z = 0"),
+        (lambda e: e["points"][1].__setitem__(2, 0.1), "endpoints must lie at x = -3.0, z = 0"),
+        (lambda e: e["reference"].__setitem__(1, 0.2), "reference must be the segment midpoint"),
+    ],
+)
+def test_entrance_endpoints_are_enforced(world, change, expected):
+    bad = copy.deepcopy(world)
+    change(bad["places"][0])
+    assert f"INVALID entrance: {expected}" in validate.geometry_errors(bad)
+
+
+def test_exit_endpoints_are_enforced(world):
+    bad = copy.deepcopy(world)
+    bad["places"][1]["points"] = [[3.0, -0.75, 0.0], [3.0, 0.6, 0.0]]
+    assert "INVALID exit: endpoints must span y = ±clear_width/2" in validate.geometry_errors(bad)
