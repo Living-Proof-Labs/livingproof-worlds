@@ -7,7 +7,8 @@
   "specification": {
     "repository": "Living-Proof-Labs/robot-capability-specs",
     "path": "specs/worlds/hallways.md",
-    "commit": "0ca62aa",
+    "tag": "v1.3.0",
+    "commit": "ad53368c11b322b787f6b71023bbe87dec839c0b",
     "document_revision": "0.2.0",
     "world_contract_revision": "0.2.0"
   },

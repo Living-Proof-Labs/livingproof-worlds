@@ -7,6 +7,7 @@ errors; they are never ignored.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -15,7 +16,10 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((ROOT / "schema" / "world.schema.json").read_text())
+RELEASE_SCHEMA = json.loads((ROOT / "schema" / "release.schema.json").read_text())
+MANIFEST = "release.json"
 EPS = 1e-9
+SPAWN_CLEARANCE = 0.25
 
 
 def _label(error) -> str:
@@ -78,6 +82,15 @@ def geometry_errors(world: dict) -> list[str]:
                 errors.append(f"INVALID {g['name']}: inner face must be |y| = clear_width/2")
             if abs(cz - sz / 2) > EPS or abs(sz - d["wall_height"]) > EPS:
                 errors.append(f"INVALID {g['name']}: must rise from z = 0 to wall_height")
+    boxes = world["geometry"]
+    for i, a in enumerate(boxes):
+        for b in boxes[i + 1 :]:
+            overlap = [
+                min(ca + sa / 2, cb + sb / 2) - max(ca - sa / 2, cb - sb / 2)
+                for ca, sa, cb, sb in zip(a["centre"], a["size"], b["centre"], b["size"])
+            ]
+            if all(o > EPS for o in overlap):
+                errors.append(f"INVALID {a['name']} overlaps {b['name']}")
     places = {p["name"]: p for p in world["places"]}
     passage = places.get("passage")
     for p in world["places"]:
@@ -87,6 +100,8 @@ def geometry_errors(world: dict) -> list[str]:
                 passage["x"][0] <= x <= passage["x"][1] and passage["y"][0] <= y <= passage["y"][1]
             ):
                 errors.append(f"INVALID {p['name']}: spawn outside passage")
+        if p["type"] == "pose" and half_w - abs(p["position"][1]) < SPAWN_CLEARANCE - EPS:
+            errors.append(f"INVALID {p['name']}: spawn closer than 0.25 m to a wall")
         if p["type"] == "segment" and abs(abs(p["reference"][0]) - half_l) > EPS:
             errors.append(f"INVALID {p['name']}: must lie on an open end x = ±length/2")
     return errors
@@ -97,14 +112,74 @@ def validate(world: dict, path: Path | None = None) -> list[str]:
     if path is not None and not errors:
         if path.parent.name != world["content_version"] or path.parent.parent.name != world["id"]:
             errors.append(f"INVALID {path}: must live at worlds/<id>/<content_version>/world.json")
-    return errors or geometry_errors(world)
+    if errors:
+        return errors
+    errors = geometry_errors(world)
+    if path is not None:
+        errors += provenance_errors(world, path.parent)
+    return errors
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def provenance_errors(world: dict, directory: Path) -> list[str]:
+    """Check the release manifest and every declared asset against files on disk."""
+    errors = []
+    manifest_path = directory / MANIFEST
+    if not manifest_path.is_file():
+        return [f"INVALID {directory.name}: missing {MANIFEST}"]
+    manifest = json.loads(manifest_path.read_text())
+    for error in Draft202012Validator(RELEASE_SCHEMA).iter_errors(manifest):
+        errors.append(f"INVALID {MANIFEST} {_label(error)}: {error.message}")
+    if errors:
+        return errors
+    if (manifest["id"], manifest["content_version"]) != (world["id"], world["content_version"]):
+        errors.append(f"INVALID {MANIFEST}: id/content_version does not match world.json")
+    on_disk = sorted(
+        str(f.relative_to(directory))
+        for f in directory.rglob("*")
+        if f.is_file() and f.name != MANIFEST
+    )
+    for name in sorted(set(on_disk) - set(manifest["files"])):
+        errors.append(f"INVALID {MANIFEST}: {name} is not listed")
+    for name, digest in sorted(manifest["files"].items()):
+        path = directory / name
+        if not path.is_file():
+            errors.append(f"INVALID {MANIFEST}: listed file {name} is missing")
+        elif sha256(path) != digest:
+            errors.append(f"INVALID {MANIFEST}: checksum mismatch for {name}")
+    for asset in world["provenance"]["assets"]:
+        path = directory / asset["path"]
+        if not path.is_file():
+            errors.append(f"INVALID asset {asset['path']}: file is missing")
+        elif sha256(path) != asset["sha256"]:
+            errors.append(f"INVALID asset {asset['path']}: checksum mismatch")
+    return errors
+
+
+def write_manifest(directory: Path) -> None:
+    world = json.loads((directory / "world.json").read_text())
+    files = {
+        str(f.relative_to(directory)): sha256(f)
+        for f in sorted(directory.rglob("*"))
+        if f.is_file() and f.name != MANIFEST
+    }
+    manifest = {"id": world["id"], "content_version": world["content_version"], "files": files}
+    (directory / MANIFEST).write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 def world_files() -> list[Path]:
     return sorted((ROOT / "worlds").glob("*/*/world.json"))
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["--write-manifest"]:
+        for directory in argv[1:]:
+            write_manifest(Path(directory))
+        return 0
     failed = False
     for path in world_files():
         errors = validate(json.loads(path.read_text()), path)

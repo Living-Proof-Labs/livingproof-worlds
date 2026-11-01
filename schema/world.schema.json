@@ -20,11 +20,12 @@
     "description": {"type": "string", "minLength": 1},
     "specification": {
       "type": "object", "additionalProperties": false,
-      "required": ["repository", "path", "commit", "document_revision", "world_contract_revision"],
+      "required": ["repository", "path", "tag", "commit", "document_revision", "world_contract_revision"],
       "properties": {
         "repository": {"type": "string", "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"},
         "path": {"type": "string"},
-        "commit": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+        "tag": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
         "document_revision": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
         "world_contract_revision": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
       }
@@ -96,7 +97,7 @@
           "type": "array",
           "items": {
             "type": "object", "additionalProperties": false, "required": ["path", "source", "license", "sha256"],
-            "properties": {"path": {"type": "string"}, "source": {"type": "string"}, "license": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+            "properties": {"path": {"type": "string", "minLength": 1}, "source": {"type": "string", "minLength": 1}, "license": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
           }
         }
       }

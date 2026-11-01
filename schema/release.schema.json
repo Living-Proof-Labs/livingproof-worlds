@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Living-Proof-Labs/livingproof-worlds/schema/release.schema.json",
+  "title": "World release manifest",
+  "description": "Version and content checksums for one released world directory. Every file in the directory except this manifest must be listed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "content_version", "files"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+    "content_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[A-Za-z0-9._/-]+$"},
+      "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    }
+  }
+}
