@@ -50,6 +50,24 @@ The first world is an open hallway with a named entrance, exit and usable passag
 Both simulators will consume the same pinned release and check floor and wall
 collisions with a simple test object; no robot or controller is involved.
 
+## Add a world
+
+1. Make sure a spec in robot-capability-specs defines the world, then pin its tag
+   and commit in `specification`.
+2. Create `worlds/<id>/<content_version>/world.json` that validates against
+   [`schema/world.schema.json`](schema/world.schema.json). Only add schema
+   features that the spec needs; anything else must stay `UNSUPPORTED`.
+3. Write `notes.md` beside it with the hand-written sections `## Purpose`,
+   `## Changelog` and `## Simulator support`.
+4. Run `task render`. It generates `world.svg` and `README.md` (from
+   [`tools/templates/world-README.md`](tools/templates/world-README.md)) and
+   rewrites `release.json` checksums. Commit all of them.
+5. Add tests for the spec's canonical values in `tests/`, then run `task check`
+   and `task test`. `task check` fails if a README or SVG is missing, stale or
+   lacks a section, or if `release.json` doesn't cover every file.
+
+Never edit a released version directory. Change a world by adding a new version.
+
 ## Development
 
 With Git, Docker Compose v2 and Task 3.54.0 installed: `task setup`, then
