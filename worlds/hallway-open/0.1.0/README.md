@@ -24,7 +24,18 @@ Specification: [Living-Proof-Labs/robot-capability-specs v1.3.0](https://github.
 
 ## Diagram
 
-![Top-down diagram of hallway-open 0.1.0](world.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="world-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="world-light.svg">
+  <img src="world.svg" width="800" alt="Top-down diagram of hallway-open 0.1.0: a 6.00 m long hallway, 1.50 m clear between two 0.15 m walls, open at both ends. Entrance (IN) at x = -3.00, exit (OUT) at x = 3.00. Passage from y = -0.50 to 0.50 m around the centreline. Spawns: spawn-entrance at (-2.50, 0.00) yaw 0°; spawn-centre at (0.00, 0.00) yaw 0°; spawn-exit at (2.50, 0.00) yaw 180°.">
+</picture>
+
+**How to read this diagram.** Top view, metres, `+x` right and `+y` up (see the
+axis glyph). Dark bars are the walls (0.15 m thick, 2.50 m
+high). The solid teal bar tagged IN is the entrance; the dashed amber bar tagged
+OUT is the exit. The shaded dashed region is the usable passage and the dotted
+line its centreline. Each dot is a spawn; its arrow points along the spawn yaw.
+The floor is 0.10 m thick with its top at z = 0.
 
 ## Dimensions
 

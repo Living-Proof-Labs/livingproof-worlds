@@ -2,9 +2,11 @@
   "id": "hallway-open",
   "content_version": "0.1.0",
   "files": {
-    "README.md": "d8e1c6ef78774192bb1213d5de84999b61ff8d531cfe3aa8c076b7a097e7ff83",
+    "README.md": "b7e1f00ccfbba4523577eeb380cfdf977587715e568fce501de86a43b65f2bb2",
     "notes.md": "a77c0f00eb413595303a4d248e7fdca89be2c2937b1452c5fa33955d0f00cbac",
+    "world-dark.svg": "0d858ce65200fd43411792de593fef4ff3e390050cba21eb0f5fbca23da6c1ee",
+    "world-light.svg": "96279e9dba22f728f1f70c65c3cc647345d6bdd17ba1f07db6624efac3978ad7",
     "world.json": "d60bb8aa6a72c8403fb6674cc9d803962c1484bc3e163527988e8c57ccec775c",
-    "world.svg": "3886266072c4ca2a1e52dffc5e3402775f0c094f4807c500388f1bb725135f5b"
+    "world.svg": "0c453697073dc4ea1f408ff08b9c81e2a53e7cb11340bb5456c0a81e480eb8bf"
   }
 }

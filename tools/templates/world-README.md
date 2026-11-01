@@ -12,7 +12,18 @@ ${document_revision}, world contract revision ${contract_revision}, commit `${sp
 
 ## Diagram
 
-![Top-down diagram of ${id} ${version}](world.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="world-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="world-light.svg">
+  <img src="world.svg" width="800" alt="${alt}">
+</picture>
+
+**How to read this diagram.** Top view, metres, `+x` right and `+y` up (see the
+axis glyph). Dark bars are the walls (${wall_thickness} m thick, ${wall_height} m
+high). The solid teal bar tagged IN is the entrance; the dashed amber bar tagged
+OUT is the exit. The shaded dashed region is the usable passage and the dotted
+line its centreline. Each dot is a spawn; its arrow points along the spawn yaw.
+The floor is ${floor_thickness} m thick with its top at z = 0.
 
 ## Dimensions
 
