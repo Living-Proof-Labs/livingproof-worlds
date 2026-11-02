@@ -78,8 +78,12 @@ before `task setup`. Inside the development container, use
 
 ## Status
 
-`hallway-open` 0.1.0 is described and validated here. No engine conversion,
-adapters, rendered evidence or release exists yet.
+`hallway-open` 0.1.0 is described and validated here and released in
+[v1.1.0](https://github.com/Living-Proof-Labs/livingproof-worlds/releases/tag/v1.1.0).
+Engine conversion lives in the simulators, not here: livingproof-sim-mujoco and
+livingproof-sim-gazebo both pin v1.1.0. The MuJoCo hallway is used by the published
+[robot verification reports](https://docs.livingprooflabs.com/livingproof-verification/);
+Gazebo robot verification is not finished yet.
 
 ## License
 
