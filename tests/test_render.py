@@ -9,8 +9,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
-import render  # noqa: E402
-import validate  # noqa: E402
+import render
+import validate
 
 SOURCE = ROOT / "worlds" / "hallway-open" / "0.1.0"
 
