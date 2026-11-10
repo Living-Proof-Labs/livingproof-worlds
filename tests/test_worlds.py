@@ -12,7 +12,7 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
-import validate  # noqa: E402
+import validate
 
 WORLD_PATH = ROOT / "worlds" / "hallway-open" / "0.1.0" / "world.json"
 SPEC = ROOT / "tests" / "fixtures" / "robot-capability-specs-v1.3.0-hallways.md"
@@ -78,7 +78,7 @@ def test_dimension_beyond_tolerance_is_reported(world):
 
 def test_named_places_match_spec_table(world):
     text = SPEC.read_text()
-    rows = re.findall(r"^\| `([a-z-]+)` \| (\w+) \| (.+) \|$", text, re.M)
+    rows = re.findall(r"^\| `([a-z-]+)` \| (\w+) \| (.+) \|$", text, re.MULTILINE)
     spec = {name: (kind, num(re.sub(r" \([^)`]*\)", "", defn))) for name, kind, defn in rows}
     places = {p["name"]: p for p in world["places"]}
     assert set(places) == set(spec)

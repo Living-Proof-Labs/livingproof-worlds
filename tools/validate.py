@@ -120,9 +120,12 @@ def geometry_errors(world: dict) -> list[str]:
 
 def validate(world: dict, path: Path | None = None) -> list[str]:
     errors = schema_errors(world)
-    if path is not None and not errors:
-        if path.parent.name != world["content_version"] or path.parent.parent.name != world["id"]:
-            errors.append(f"INVALID {path}: must live at worlds/<id>/<content_version>/world.json")
+    if (
+        path is not None
+        and not errors
+        and (path.parent.name != world["content_version"] or path.parent.parent.name != world["id"])
+    ):
+        errors.append(f"INVALID {path}: must live at worlds/<id>/<content_version>/world.json")
     if errors:
         return errors
     errors = geometry_errors(world)

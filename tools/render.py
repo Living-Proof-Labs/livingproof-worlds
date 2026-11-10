@@ -17,7 +17,7 @@ from pathlib import Path
 from string import Template
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import validate  # noqa: E402
+import validate
 
 ROOT = validate.ROOT
 TEMPLATE = ROOT / "tools" / "templates" / "world-README.md"
@@ -125,9 +125,11 @@ def describe(world: dict) -> str:
     d = world["dimensions"]
     places = {p["name"]: p for p in world["places"]}
     parts = [
-        f"Top-down diagram of {world['id']} {world['content_version']}: a "
-        f"{f(d['length'])} m long hallway, {f(d['clear_width'])} m clear between two "
-        f"{f(d['wall_thickness'])} m walls, open at both ends."
+        (
+            f"Top-down diagram of {world['id']} {world['content_version']}: a "
+            f"{f(d['length'])} m long hallway, {f(d['clear_width'])} m clear between two "
+            f"{f(d['wall_thickness'])} m walls, open at both ends."
+        )
     ]
     if "entrance" in places and "exit" in places:
         parts.append(
@@ -369,11 +371,15 @@ def render_svg(world: dict, mode: str = "auto") -> str:
     sid = f"{world['id']}-{world['content_version'].replace('.', '-')}"
     out = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {VIEW_W} {lay["height"]}" '
-        f'width="{VIEW_W}" height="{lay["height"]}" role="img" '
-        f'aria-labelledby="{sid}-title {sid}-desc">',
-        f'<title id="{sid}-title">{esc(world["title"])}, {esc(world["id"])} '
-        f"{esc(world['content_version'])}: top-down diagram</title>",
+        (
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {VIEW_W} {lay["height"]}" '
+            f'width="{VIEW_W}" height="{lay["height"]}" role="img" '
+            f'aria-labelledby="{sid}-title {sid}-desc">'
+        ),
+        (
+            f'<title id="{sid}-title">{esc(world["title"])}, {esc(world["id"])} '
+            f"{esc(world['content_version'])}: top-down diagram</title>"
+        ),
         f'<desc id="{sid}-desc">{esc(describe(world))}</desc>',
         _style(mode),
         *lay["body"],
@@ -409,7 +415,7 @@ def read_notes(directory: Path) -> dict[str, str]:
     path = directory / "notes.md"
     if not path.is_file():
         raise SystemExit(f"{path.relative_to(ROOT)}: missing (hand-written README sections)")
-    parts = re.split(r"^## (.+)$", path.read_text(), flags=re.M)
+    parts = re.split(r"^## (.+)$", path.read_text(), flags=re.MULTILINE)
     notes = {parts[i].strip(): parts[i + 1].strip() for i in range(1, len(parts), 2)}
     missing = [s for s in NOTE_SECTIONS if not notes.get(s)]
     if missing:
@@ -472,7 +478,7 @@ def render_readme(world: dict, notes: dict[str, str]) -> str:
 
 
 def readme_section_errors(text: str) -> list[str]:
-    present = set(re.findall(r"^## (.+)$", text, flags=re.M))
+    present = set(re.findall(r"^## (.+)$", text, flags=re.MULTILINE))
     return [f"missing section '{s}'" for s in REQUIRED_SECTIONS if s not in present]
 
 
