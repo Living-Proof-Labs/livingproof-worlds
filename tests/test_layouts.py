@@ -15,6 +15,10 @@ import validate
 
 HALLWAY = ROOT / "worlds" / "hallway-open" / "0.1.0"
 FIXTURES = ROOT / "tests" / "fixtures" / "worlds"
+# Copy of robot-capability-specs test/fixtures/worlds/l-shaped.world.json from PR #47 at
+# 57ea03a88dab8174a9e8f22d97d8c242db2451fc. Replace with the released copy once specs releases.
+SPECS_L = ROOT / "tests" / "fixtures" / "robot-capability-specs-l-shaped.world.json"
+SPECS_L_SHA256 = "ceea5c9b25665b9874b39ebd1c259b8811e999d72b5a4219780f226b09450e40"
 # Every file of hallway-open 0.1.0 as released (release.json at v1.1.8, the same bytes since
 # v1.0.0), plus release.json itself. Released world versions are immutable; this must never change.
 RELEASED = {
@@ -51,13 +55,13 @@ def test_hallway_open_meets_the_layout_rules_with_its_route():
     assert world["format"] == "livingproof-world/0.1"
     assert validate.ROUTE[world["format"]] == "passage-centreline"
     assert validate.layout_errors(world) == []
-    assert validate.route_length(world) == 5.5
+    assert validate.route_length(world, "passage-centreline") == 5.5
 
 
 def test_l_shaped_world_validates(l_world):
     assert l_world["format"] == "livingproof-world/0.2"
     assert validate.validate(l_world) == []
-    assert validate.route_length(l_world) == 5.5
+    assert validate.route_length(l_world, "route-centreline") == 5.5
     route = next(p for p in l_world["places"] if p["name"] == "route-centreline")
     assert len(route["points"]) == 3
     assert "length" not in l_world["dimensions"]
@@ -121,6 +125,8 @@ def place(world, name):
         (lambda w: w["geometry"][3]["size"].__setitem__(2, 2.0), "wall_height"),
         (lambda w: w["geometry"][3]["size"].__setitem__(0, 0.3), "wall_thickness"),
         (lambda w: w["places"].append({**place(w, "corner"), "name": "entrance"}), "unique"),
+        (lambda w: w["frame"]["axes"].update(z="down"), "INVALID frame/axes/z"),
+        (lambda w: w["frame"].update(pose="yaw in radians"), "INVALID frame/pose"),
     ],
 )
 def test_layout_rules_reject_bad_worlds(l_world, change, expected):
@@ -134,3 +140,19 @@ def test_straight_hallway_checks_still_apply_to_format_0_1():
     assert any("length" in e for e in errors), errors
     errors = mutate(world, lambda w: w["places"][1]["reference"].__setitem__(0, 2.5))
     assert "INVALID exit: must lie on an open end x = ±length/2" in errors
+
+
+def test_l_shaped_fixture_matches_the_specs_fixture(l_world):
+    assert hashlib.sha256(SPECS_L.read_bytes()).hexdigest() == SPECS_L_SHA256
+    specs = load(SPECS_L)
+    for key in ("id", "content_version", "units", "dimensions", "geometry", "places", "tolerances"):
+        assert l_world[key] == specs[key], key
+
+
+def test_format_0_2_yaw_is_counterclockwise_from_x(l_world):
+    # The facing rule reads yaw in degrees about +z from +x: 0 faces +x along the first leg.
+    turned = copy.deepcopy(l_world)
+    place(turned, "spawn-entrance")["yaw_deg"] = 360.0
+    assert validate.validate(turned) == []
+    place(turned, "spawn-entrance")["yaw_deg"] = -90.0
+    assert any("must face along" in e for e in validate.validate(turned))

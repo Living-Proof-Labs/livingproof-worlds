@@ -8,7 +8,7 @@
   "required": ["format", "id", "content_version", "title", "description", "specification", "units", "frame", "dimensions", "geometry", "places", "tolerances", "provenance", "license"],
   "allOf": [
     {"if": {"required": ["format"], "properties": {"format": {"const": "livingproof-world/0.1"}}}, "then": {"properties": {"dimensions": {"required": ["length", "exterior_width"]}}}},
-    {"if": {"required": ["format"], "properties": {"format": {"const": "livingproof-world/0.2"}}}, "then": {"properties": {"dimensions": {"not": {"anyOf": [{"required": ["length"]}, {"required": ["exterior_width"]}]}}}}}
+    {"if": {"required": ["format"], "properties": {"format": {"const": "livingproof-world/0.2"}}}, "then": {"properties": {"dimensions": {"not": {"anyOf": [{"required": ["length"]}, {"required": ["exterior_width"]}]}}, "frame": {"properties": {"axes": {"properties": {"z": {"const": "up"}}}, "pose": {"const": "position (x, y, z) plus yaw in degrees, positive about +z"}}}}}}
   ],
   "$defs": {
     "vec3": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},

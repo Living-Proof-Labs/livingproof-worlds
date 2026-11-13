@@ -138,10 +138,11 @@ def route_station(route: dict, point) -> tuple[float, float, float]:
     return best[0], best[1], walked
 
 
-def route_length(world: dict, start: str = "spawn-entrance") -> float:
-    """Distance along the route from the point nearest ``start`` to the route's end."""
+def route_length(world: dict, route: str, start: str = "spawn-entrance") -> float:
+    """Distance along polyline ``route`` from the point on it nearest pose ``start`` to its
+    last point, which the layout rules place at the exit reference point."""
     places = {p["name"]: p for p in world["places"]}
-    _, station, length = route_station(places[ROUTE[world["format"]]], places[start]["position"])
+    _, station, length = route_station(places[route], places[start]["position"])
     return length - station
 
 

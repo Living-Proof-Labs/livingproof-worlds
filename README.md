@@ -49,7 +49,9 @@ Each world lives at `worlds/<id>/<content_version>/` as `world.json` plus a
    `passage-centreline`: its entrance and exit must also sit on the open ends, and its
    dimensions must be within 0.01 m of the canonical table in a vendored copy of the
    pinned spec. Format `livingproof-world/0.2` is any layout of axis-aligned walls,
-   such as two hallways meeting at a corner, with route `route-centreline`. A
+   such as two hallways meeting at a corner, with route `route-centreline`. Its frame
+   has `+z` up with the floor top at `z = 0`, and a pose's yaw is in degrees,
+   counterclockwise about `+z` from `+x`. A
    synthetic L-shaped test world in `tests/fixtures/worlds/` shows it validates.
 3. **Provenance:** every asset declares a licence, a source and a sha256, and
    `release.json` ([schema](schema/release.schema.json)) records the id, content
