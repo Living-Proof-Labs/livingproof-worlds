@@ -1,11 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Living-Proof-Labs/livingproof-worlds/schema/world.schema.json",
-  "title": "Living Proof Labs world, format livingproof-world/0.1",
-  "description": "Engine-neutral static world. Every object is closed: unknown fields, geometry types and place types are rejected, never ignored.",
+  "title": "Living Proof Labs world, formats livingproof-world/0.1 and livingproof-world/0.2",
+  "description": "Engine-neutral static world. Every object is closed: unknown fields, geometry types and place types are rejected, never ignored. livingproof-world/0.1 is a straight hallway along x and declares length and exterior_width. livingproof-world/0.2 is any layout of axis-aligned box floors and walls, with named places and a route polyline named route-centreline (robot-capability-specs world contract 0.3.0, section Any layout); it declares neither length nor exterior_width.",
   "type": "object",
   "additionalProperties": false,
   "required": ["format", "id", "content_version", "title", "description", "specification", "units", "frame", "dimensions", "geometry", "places", "tolerances", "provenance", "license"],
+  "allOf": [
+    {"if": {"required": ["format"], "properties": {"format": {"const": "livingproof-world/0.1"}}}, "then": {"properties": {"dimensions": {"required": ["length", "exterior_width"]}}}},
+    {"if": {"required": ["format"], "properties": {"format": {"const": "livingproof-world/0.2"}}}, "then": {"properties": {"dimensions": {"not": {"anyOf": [{"required": ["length"]}, {"required": ["exterior_width"]}]}}}}}
+  ],
   "$defs": {
     "vec3": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
     "interval": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
@@ -13,7 +17,7 @@
     "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
   },
   "properties": {
-    "format": {"const": "livingproof-world/0.1"},
+    "format": {"enum": ["livingproof-world/0.1", "livingproof-world/0.2"]},
     "id": {"$ref": "#/$defs/name"},
     "content_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
     "title": {"type": "string", "minLength": 1},
@@ -46,7 +50,7 @@
     },
     "dimensions": {
       "type": "object", "additionalProperties": false,
-      "required": ["clear_width", "length", "wall_height", "wall_thickness", "exterior_width", "floor_thickness"],
+      "required": ["clear_width", "wall_height", "wall_thickness", "floor_thickness"],
       "properties": {
         "clear_width": {"$ref": "#/$defs/positive"},
         "length": {"$ref": "#/$defs/positive"},

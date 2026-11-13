@@ -39,9 +39,18 @@ Each world lives at `worlds/<id>/<content_version>/` as `world.json` plus a
 1. **Schema:** [`schema/world.schema.json`](schema/world.schema.json) is closed, so an
    unknown field, geometry type or place type fails with `UNSUPPORTED` instead
    of being ignored.
-2. **Semantic geometry:** no overlapping solids, spawns inside the passage and at
-   least 0.25 m from the walls, entrance and exit on the open ends, and dimensions
-   within 0.01 m of the canonical table in a vendored copy of the pinned spec.
+2. **Semantic geometry:** every world meets the layout rules of the
+   robot-capability-specs world contract 0.3.0 ("Any layout"). Floors and walls are
+   axis-aligned boxes that do not overlap. `entrance` and `exit` are segments across
+   the clear width. A route polyline runs from the entrance to the exit at least half
+   the clear width from every wall. `spawn-entrance` lies on the route, facing along it,
+   and every spawn is at least 0.25 m from the walls. Format
+   `livingproof-world/0.1` is a straight hallway along x, with route
+   `passage-centreline`: its entrance and exit must also sit on the open ends, and its
+   dimensions must be within 0.01 m of the canonical table in a vendored copy of the
+   pinned spec. Format `livingproof-world/0.2` is any layout of axis-aligned walls,
+   such as two hallways meeting at a corner, with route `route-centreline`. A
+   synthetic L-shaped test world in `tests/fixtures/worlds/` shows it validates.
 3. **Provenance:** every asset declares a licence, a source and a sha256, and
    `release.json` ([schema](schema/release.schema.json)) records the id, content
    version and the sha256 of every file, recomputed on each run. After an
