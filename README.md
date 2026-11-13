@@ -1,5 +1,8 @@
 # livingproof-worlds
 
+**Start here: documentation** — [manual source and preview instructions](docs/manual.md).
+Publication is pending deployment and live verification.
+
 Versioned, engine-neutral robot test worlds for Living Proof Labs simulators.
 
 A world here describes static geometry, named places (such as an entrance, an

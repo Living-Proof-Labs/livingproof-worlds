@@ -40,3 +40,12 @@ tasks:
     cmds:
       - task: check
       - task: test
+  manual:build:
+    desc: Generate the repository manual from canonical sources
+    cmds:
+      - uv run --locked --no-sync python tools/manual/build.py
+  manual:verify:
+    desc: Build the manual and check links, branding and source identity
+    cmds:
+      - task: manual:build
+      - uv run --locked --no-sync pytest tests/test_manual.py --junitxml=artifacts/manual/tests.xml

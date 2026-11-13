@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+site_name: Living Proof Labs worlds
+site_url: https://docs.livingprooflabs.com/livingproof-worlds/
+use_directory_urls: false
+strict: true
+theme:
+  name: zensical
+  font: false
+  palette:
+    - media: '(prefers-color-scheme: light)'
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: {icon: lucide/moon, name: Switch to dark mode}
+    - media: '(prefers-color-scheme: dark)'
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: {icon: lucide/sun, name: Switch to light mode}
+extra_css:
+  - assets/brand.css
+markdown_extensions:
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.superfences
+nav:
+  - Documentation home: https://docs.livingprooflabs.com/
+  - Start here: index.md
+  - Guides:
+      - Using and adding worlds: guide.md
+      - Open hallway 0.1.0: worlds/hallway-open/0.1.0/index.md
+  - Reference:
+      - Tasks: tasks.md
+      - World contract: schema/world.schema.json
+      - Release contract: schema/release.schema.json
+  - Verification: index.md
+  - Contribute: AGENTS.md
+  - Version and source: version.md
+  - Help / report an issue: https://github.com/Living-Proof-Labs/livingproof-worlds/issues
+  - License: https://github.com/Living-Proof-Labs/livingproof-worlds/blob/main/LICENSE

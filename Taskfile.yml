@@ -23,3 +23,9 @@ tasks:
   verify:
     desc: Check and test in the development environment
     cmds: [bash tools/run-task.sh verify]
+  manual:build:
+    desc: Build the branded repository manual
+    cmds: [bash tools/run-task.sh manual:build]
+  manual:verify:
+    desc: Build and check the repository manual
+    cmds: [bash tools/run-task.sh manual:verify]
