@@ -1,7 +1,7 @@
 # Agent instructions
 
 <!-- renovate: guidelines -->
-[collaboration-guidelines v7.8.2](https://github.com/Living-Proof-Labs/collaboration-guidelines/blob/v7.8.2/AGENTS.md)
+[collaboration-guidelines v9.2.0](https://github.com/Living-Proof-Labs/collaboration-guidelines/blob/v9.2.0/AGENTS.md)
 applies, with its procedures, to every change in this repository.
 Local additions: worlds are engine-neutral static descriptions only. No engine
 conversion, simulator adapters, robots or controllers here; those live in the
