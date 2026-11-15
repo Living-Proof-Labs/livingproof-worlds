@@ -9,6 +9,7 @@ Output is deterministic: fixed number formatting, no timestamps, stable ordering
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 import re
@@ -122,6 +123,8 @@ def text_width(text: str, size: float) -> float:
 
 def describe(world: dict) -> str:
     """Plain-language description shared by the SVG <desc> and the README alt text."""
+    if world["format"] != validate.STRAIGHT:
+        return describe_plan(world)
     d = world["dimensions"]
     places = {p["name"]: p for p in world["places"]}
     parts = [
@@ -157,6 +160,8 @@ def describe(world: dict) -> str:
 
 def layout(world: dict) -> dict:
     """Compute every element position. Returns SVG body parts and a box model for tests."""
+    if world["format"] != validate.STRAIGHT:
+        return layout_plan(world)
     d = world["dimensions"]
     floor = next(g for g in world["geometry"] if g["role"] == "floor")
     xmin = floor["centre"][0] - floor["size"][0] / 2
@@ -366,6 +371,304 @@ def layout(world: dict) -> dict:
     return {"body": body, "boxes": boxes, "height": height}
 
 
+# Format livingproof-world/0.2: any layout of axis-aligned walls. The straight-hallway
+# drawing above stays exactly as it was, so hallway-open 0.1.0 renders byte-identically.
+PLAN_MAX_SCALE = 96.0  # px per metre, the scale hallway-open is drawn at
+PLAN_MARGIN = 120  # room each side for the IN and OUT tags and the clear-width dimension
+
+
+def _route(world: dict) -> dict:
+    name = validate.ROUTE[world["format"]]
+    return next(p for p in world["places"] if p["name"] == name)
+
+
+def _extent(world: dict) -> tuple[float, float, float, float]:
+    boxes = world["geometry"]
+    return (
+        min(g["centre"][0] - g["size"][0] / 2 for g in boxes),
+        max(g["centre"][0] + g["size"][0] / 2 for g in boxes),
+        min(g["centre"][1] - g["size"][1] / 2 for g in boxes),
+        max(g["centre"][1] + g["size"][1] / 2 for g in boxes),
+    )
+
+
+def _route_length(route: dict) -> float:
+    pts = route["points"]
+    return sum(validate._dist(a, b) for a, b in itertools.pairwise(pts))
+
+
+def _outward(world: dict, name: str) -> tuple[float, float]:
+    """Unit floor-plane direction pointing out of the world through entrance or exit."""
+    pts = _route(world)["points"]
+    a, b = (pts[1], pts[0]) if name == "entrance" else (pts[-2], pts[-1])
+    length = validate._dist(a, b)
+    return (b[0] - a[0]) / length, (b[1] - a[1]) / length
+
+
+def describe_plan(world: dict) -> str:
+    d = world["dimensions"]
+    places = {p["name"]: p for p in world["places"]}
+    route = _route(world)
+    legs = len(route["points"]) - 1
+    parts = [
+        (
+            f"Top-down diagram of {world['id']} {world['content_version']}: "
+            f"{'a hallway' if legs == 1 else f'{legs} hallways'} "
+            f"{f(d['clear_width'])} m clear between {f(d['wall_thickness'])} m walls, "
+            f"along a {f(_route_length(route))} m route {route['name']} through "
+            + ", ".join(f"({f(x)}, {f(y)})" for x, y, _ in route["points"])
+            + "."
+        )
+    ]
+    ent, ext = places["entrance"]["reference"], places["exit"]["reference"]
+    parts.append(
+        f"Entrance (IN) at ({f(ent[0])}, {f(ent[1])}), exit (OUT) at ({f(ext[0])}, {f(ext[1])})."
+    )
+    for p in world["places"]:
+        if p["type"] == "region":
+            parts.append(
+                f"Region {p['name']} from x = {f(p['x'][0])} to {f(p['x'][1])} m, "
+                f"y = {f(p['y'][0])} to {f(p['y'][1])} m."
+            )
+    spawns = [p for p in world["places"] if p["type"] == "pose"]
+    parts.append(
+        "Spawns: "
+        + "; ".join(
+            f"{p['name']} at ({f(p['position'][0])}, {f(p['position'][1])}) "
+            f"yaw {f(p['yaw_deg'], 0)}°"
+            for p in spawns
+        )
+        + "."
+    )
+    return " ".join(parts)
+
+
+def layout_plan(world: dict) -> dict:
+    """Top view of any layout of axis-aligned boxes, drawn only from world.json."""
+    d = world["dimensions"]
+    places = {p["name"]: p for p in world["places"]}
+    route = _route(world)
+    regions = [p for p in world["places"] if p["type"] == "region"]
+    spawns = [p for p in world["places"] if p["type"] == "pose"]
+    xmin, xmax, ymin, ymax = _extent(world)
+    scale = min(PLAN_MAX_SCALE, (VIEW_W - 2 * PLAN_MARGIN) / (xmax - xmin))
+    left = (VIEW_W - (xmax - xmin) * scale) / 2
+    boxes = []  # (kind, name, x0, y0, x1, y1)
+    body = []
+
+    def tbox(name, x, y, text, size, anchor="start"):
+        w = text_width(text, size)
+        x0 = x - w if anchor == "end" else x - w / 2 if anchor == "middle" else x
+        boxes.append(("text", name, x0, y - size * 0.8, x0 + w, y + size * 0.25))
+
+    def text(name, x, y, value, size=FS_LABEL, anchor="start", cls=None):
+        tbox(name, x, y, value, size, anchor)
+        attrs = f' class="{cls}"' if cls else ""
+        attrs += f' text-anchor="{anchor}"' if anchor != "start" else ""
+        body.append(f'<text{attrs} x="{f(x, 1)}" y="{f(y, 1)}">{esc(value)}</text>')
+
+    # Title and legend rows, as for the straight hallway, naming this world's own places.
+    y = PAD + FS_TITLE
+    text(
+        "title",
+        PAD,
+        y,
+        f"{world['title']} · {world['id']} {world['content_version']} · top view",
+        FS_TITLE,
+        cls="title",
+    )
+    y += 26
+    lx = PAD
+    legend = [("wall", '<rect class="wall" x="{x}" y="{y0}" width="16" height="8"/>')]
+    legend += [
+        (r["name"], '<rect class="passage" x="{x}" y="{y0}" width="16" height="8"/>')
+        for r in regions
+    ]
+    legend += [
+        (route["name"], '<line class="centre" x1="{x}" y1="{ym}" x2="{x16}" y2="{ym}"/>'),
+        ("IN entrance", '<rect class="entrance" x="{x6}" y="{y0}" width="5" height="10"/>'),
+        ("OUT exit", '<line class="exit" x1="{x8}" y1="{y0}" x2="{x8}" y2="{y10}"/>'),
+        ("spawn + yaw", '<circle class="spawn" cx="{x8}" cy="{ym}" r="4"/>'),
+    ]
+    for label, shape in legend:
+        body.append(
+            shape.format(
+                x=f(lx, 1),
+                x6=f(lx + 6, 1),
+                x8=f(lx + 8, 1),
+                x16=f(lx + 16, 1),
+                y0=f(y - 9, 1),
+                ym=f(y - 4, 1),
+                y10=f(y + 1, 1),
+            )
+        )
+        text("legend " + label, lx + 22, y, label)
+        lx += 22 + text_width(label, FS_LABEL) + 18
+    # Room above the plan for a tag and a dimension beyond an exit or entrance at the top.
+    top = y + 14 + 56
+
+    def px(x):
+        return left + (x - xmin) * scale
+
+    def py(v):
+        return top + (ymax - v) * scale
+
+    for g in world["geometry"]:
+        if g["role"] == "floor":
+            (cx, cy, _), (sx, sy, _) = g["centre"], g["size"]
+            body.append(
+                f'<rect class="floor" x="{f(px(cx - sx / 2), 1)}" y="{f(py(cy + sy / 2), 1)}" '
+                f'width="{f(sx * scale, 1)}" height="{f(sy * scale, 1)}"/>'
+            )
+    for g in world["geometry"]:
+        if g["role"] == "wall":
+            (cx, cy, _), (sx, sy, _) = g["centre"], g["size"]
+            x0, y0 = px(cx - sx / 2), py(cy + sy / 2)
+            boxes.append(("wall", g["name"], x0, y0, x0 + sx * scale, y0 + sy * scale))
+            body.append(
+                f'<rect class="wall" x="{f(x0, 1)}" y="{f(y0, 1)}" '
+                f'width="{f(sx * scale, 1)}" height="{f(sy * scale, 1)}"/>'
+            )
+    for r in regions:
+        body.append(
+            f'<rect class="passage" x="{f(px(r["x"][0]), 1)}" y="{f(py(r["y"][1]), 1)}" '
+            f'width="{f((r["x"][1] - r["x"][0]) * scale, 1)}" '
+            f'height="{f((r["y"][1] - r["y"][0]) * scale, 1)}"/>'
+        )
+        cx, cy = px(sum(r["x"]) / 2), py(sum(r["y"]) / 2)
+        text(
+            "region " + r["name"],
+            cx,
+            cy + FS_LABEL * 0.35 + 18,
+            r["name"],
+            anchor="middle",
+            cls="muted",
+        )
+    pts = " ".join(f"{f(px(x), 1)},{f(py(v), 1)}" for x, v, _ in route["points"])
+    body.append(f'<polyline class="centre" points="{pts}"/>')
+    # Entrance: solid teal bar + IN. Exit: dashed amber bar + OUT. Tags sit outside the world.
+    for name, tag in (("entrance", "IN"), ("exit", "OUT")):
+        (x0, y0, _), (x1, y1, _) = places[name]["points"]
+        a, b = (px(x0), py(y0)), (px(x1), py(y1))
+        ux, uy = _outward(world, name)
+        ox, oy = ux, -uy  # SVG y points down
+        if name == "entrance":
+            corners = [
+                (a[0] + 3 * ox, a[1] + 3 * oy),
+                (a[0] - 3 * ox, a[1] - 3 * oy),
+                (b[0] - 3 * ox, b[1] - 3 * oy),
+                (b[0] + 3 * ox, b[1] + 3 * oy),
+            ]
+            body.append(
+                '<polygon class="entrance" points="'
+                + " ".join(f"{f(cx, 1)},{f(cy, 1)}" for cx, cy in corners)
+                + '"/>'
+            )
+            cls = "tag-in"
+        else:
+            body.append(
+                f'<line class="exit" x1="{f(a[0], 1)}" y1="{f(a[1], 1)}" '
+                f'x2="{f(b[0], 1)}" y2="{f(b[1], 1)}"/>'
+            )
+            cls = "tag-out"
+        boxes.append(
+            (
+                "bar",
+                name,
+                min(a[0], b[0]) - 3,
+                min(a[1], b[1]) - 3,
+                max(a[0], b[0]) + 3,
+                max(a[1], b[1]) + 3,
+            )
+        )
+        mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        if abs(ox) >= abs(oy):
+            anchor = "start" if ox > 0 else "end"
+            text(f"tag {tag}", mx + 10 * ox, my + FS_TAG * 0.35, tag, FS_TAG, anchor, cls)
+        else:
+            ty = my - 10 if oy < 0 else my + 10 + FS_TAG * 0.8
+            text(f"tag {tag}", mx, ty, tag, FS_TAG, "middle", cls)
+    # Clear width: a dimension across the exit, beyond its tag.
+    (x0, y0, _), (x1, y1, _) = places["exit"]["points"]
+    ux, uy = _outward(world, "exit")
+    off = 36
+    a = (px(x0) + off * ux, py(y0) - off * uy)
+    b = (px(x1) + off * ux, py(y1) - off * uy)
+    body.append(
+        f'<line class="dim" x1="{f(a[0], 1)}" y1="{f(a[1], 1)}" x2="{f(b[0], 1)}" y2="{f(b[1], 1)}"/>'
+    )
+    nx, ny = ux * 5, -uy * 5
+    for cx, cy in (a, b):
+        body.append(
+            f'<line class="dim" x1="{f(cx - nx, 1)}" y1="{f(cy - ny, 1)}" '
+            f'x2="{f(cx + nx, 1)}" y2="{f(cy + ny, 1)}"/>'
+        )
+    clear_text = f"{f(d['clear_width'])} m clear"
+    end = max((a, b), key=lambda q: q[0])
+    text("dim clear", end[0] + 8, end[1] + FS_DIM * 0.35, clear_text, FS_DIM, cls="dimtext")
+    # Spawns: filled yaw arrows with a halo; labels in a row below the plan, with leaders.
+    bottom = py(ymin)
+    label_row = bottom + 14 + FS_LABEL
+    for p in spawns:
+        x, v, _ = p["position"]
+        sx, sy = px(x), py(v)
+        yaw = math.radians(p["yaw_deg"])
+        ux, uy = math.cos(yaw), -math.sin(yaw)
+        tip = (sx + 30 * ux, sy + 30 * uy)
+        base = (sx + 6 * ux, sy + 6 * uy)
+        nx, ny = -uy, ux
+        neck = (sx + 20 * ux, sy + 20 * uy)
+        poly = [
+            (base[0] + 3 * nx, base[1] + 3 * ny),
+            (neck[0] + 3 * nx, neck[1] + 3 * ny),
+            (neck[0] + 9 * nx, neck[1] + 9 * ny),
+            tip,
+            (neck[0] - 9 * nx, neck[1] - 9 * ny),
+            (neck[0] - 3 * nx, neck[1] - 3 * ny),
+            (base[0] - 3 * nx, base[1] - 3 * ny),
+        ]
+        body.append(
+            '<polygon class="yaw" points="'
+            + " ".join(f"{f(q, 1)},{f(r, 1)}" for q, r in poly)
+            + '"/>'
+        )
+        body.append(f'<circle class="spawn" cx="{f(sx, 1)}" cy="{f(sy, 1)}" r="6"/>')
+        label = (
+            f"{p['name']} ({f(p['position'][0])}, {f(p['position'][1])}) · "
+            f"yaw {f(p['yaw_deg'], 0)}°"
+        )
+        w = text_width(label, FS_LABEL)
+        lx = min(max(sx - w / 2, PAD), VIEW_W - PAD - w)
+        body.append(
+            f'<line class="leader" x1="{f(sx, 1)}" y1="{f(sy, 1)}" '
+            f'x2="{f(sx, 1)}" y2="{f(label_row - FS_LABEL, 1)}"/>'
+        )
+        text("spawn " + p["name"], lx, label_row, label)
+        label_row += FS_LABEL + 8
+    # Footer: axis glyph and the route length.
+    ay = label_row + 28
+    ax = PAD + 4
+    body.append(
+        f'<line class="axis" x1="{f(ax, 1)}" y1="{f(ay, 1)}" x2="{f(ax + 22, 1)}" y2="{f(ay, 1)}"/>'
+    )
+    body.append(
+        f'<line class="axis" x1="{f(ax, 1)}" y1="{f(ay, 1)}" x2="{f(ax, 1)}" y2="{f(ay - 22, 1)}"/>'
+    )
+    body.append(
+        f'<polygon class="axishead" points="{f(ax + 28, 1)},{f(ay, 1)} {f(ax + 21, 1)},{f(ay - 4, 1)} '
+        f'{f(ax + 21, 1)},{f(ay + 4, 1)}"/>'
+    )
+    body.append(
+        f'<polygon class="axishead" points="{f(ax, 1)},{f(ay - 28, 1)} {f(ax - 4, 1)},{f(ay - 21, 1)} '
+        f'{f(ax + 4, 1)},{f(ay - 21, 1)}"/>'
+    )
+    text("axis x", ax + 31, ay + 4, "+x")
+    text("axis y", ax + 7, ay - 24, "+y")
+    length_text = f"{route['name']}: {f(_route_length(route))} m from entrance to exit"
+    text("dim route", VIEW_W / 2, ay + 4, length_text, FS_DIM, "middle", "dimtext")
+    return {"body": body, "boxes": boxes, "height": math.ceil(ay + 4 + PAD)}
+
+
 def render_svg(world: dict, mode: str = "auto") -> str:
     lay = layout(world)
     sid = f"{world['id']}-{world['content_version'].replace('.', '-')}"
@@ -426,14 +729,32 @@ def read_notes(directory: Path) -> dict[str, str]:
 def render_readme(world: dict, notes: dict[str, str]) -> str:
     d = world["dimensions"]
     spec = world["specification"]
-    rows = [
-        ("Clear width (between inner wall faces)", d["clear_width"]),
-        ("Length (floor and walls along +x)", d["length"]),
-        ("Wall height (from floor top)", d["wall_height"]),
-        ("Wall thickness", d["wall_thickness"]),
-        ("Exterior width", d["exterior_width"]),
-        ("Floor thickness", d["floor_thickness"]),
-    ]
+    if world["format"] == validate.STRAIGHT:
+        rows = [
+            ("Clear width (between inner wall faces)", d["clear_width"]),
+            ("Length (floor and walls along +x)", d["length"]),
+            ("Wall height (from floor top)", d["wall_height"]),
+            ("Wall thickness", d["wall_thickness"]),
+            ("Exterior width", d["exterior_width"]),
+            ("Floor thickness", d["floor_thickness"]),
+        ]
+        passage = (
+            "The shaded dashed region is the usable passage and the dotted\nline its centreline."
+        )
+    else:
+        route = _route(world)
+        rows = [
+            ("Clear width (between inner wall faces)", d["clear_width"]),
+            (f"Route length (`{route['name']}`, entrance to exit)", _route_length(route)),
+            ("Wall height (from floor top)", d["wall_height"]),
+            ("Wall thickness", d["wall_thickness"]),
+            ("Floor thickness", d["floor_thickness"]),
+        ]
+        regions = [f"`{r['name']}`" for r in world["places"] if r["type"] == "region"]
+        passage = (
+            f"Each shaded dashed region is a named region ({', '.join(regions)}), and the\n"
+            f"dotted line is the route `{route['name']}`."
+        )
     dims = "\n".join(f"| {label} | {f(v)} m |" for label, v in rows)
     places = "\n".join(f"| `{p['name']}` | {p['type']} | {coords(p)} |" for p in world["places"])
     assets = world["provenance"]["assets"]
@@ -474,6 +795,7 @@ def render_readme(world: dict, notes: dict[str, str]) -> str:
         wall_thickness=f(d["wall_thickness"]),
         wall_height=f(d["wall_height"]),
         floor_thickness=f(d["floor_thickness"]),
+        passage=passage,
     )
 
 

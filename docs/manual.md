@@ -4,7 +4,8 @@
 
 Living Proof Labs worlds supplies versioned, engine-neutral static geometry for
 simulator adapters. Start with the [open hallway guide](../worlds/hallway-open/0.1.0/README.md)
-and its diagram, then read [using and adding worlds](../README.md).
+and its diagram, then the [corner hallway guide](../worlds/hallway-corner/0.1.0/README.md),
+and read [using and adding worlds](../README.md).
 This repository contains no robots, controllers, engine conversion or simulation.
 Equivalent geometry does not establish equivalent physics or capability results.
 
