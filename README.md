@@ -32,6 +32,7 @@ Equivalent geometry does not imply identical physics.
 | World | Content version | Specification |
 | --- | --- | --- |
 | [`hallway-open`](worlds/hallway-open/0.1.0/world.json) | `0.1.0` | robot-capability-specs v1.3.0 `specs/worlds/hallways.md`, document revision 0.2.0 |
+| [`hallway-corner`](worlds/hallway-corner/0.1.0/world.json) | `0.1.0` | robot-capability-specs v2.2.2 `specs/worlds/README.md`, world contract revision 0.3.0 ("Any layout") |
 
 Each world lives at `worlds/<id>/<content_version>/` as `world.json` plus a
 `release.json` manifest. `task test` checks three layers, without running a simulator:
@@ -58,6 +59,12 @@ Each world lives at `worlds/<id>/<content_version>/` as `world.json` plus a
    version and the sha256 of every file, recomputed on each run. After an
    intended change in a new version directory, regenerate it with
    `python tools/validate.py --write-manifest worlds/<id>/<version>`.
+
+The second world, `hallway-corner`, is two 1.50 m hallways meeting at a right
+angle, with a `corner` region where they meet and a three-point `route-centreline`.
+It is drawn and documented from `world.json` the same way, for the `walk-corner`
+scenario in
+[robot-capability-specs #40](https://github.com/Living-Proof-Labs/robot-capability-specs/issues/40).
 
 The first world is an open hallway with a named entrance, exit and usable passage, defined by
 [robot-capability-specs #18](https://github.com/Living-Proof-Labs/robot-capability-specs/pull/18).
@@ -98,6 +105,10 @@ Engine conversion lives in the simulators, not here: livingproof-sim-mujoco and
 livingproof-sim-gazebo both pin v1.1.0. The MuJoCo hallway is used by the published
 [robot verification reports](https://docs.livingprooflabs.com/livingproof-verification/);
 Gazebo robot verification is not finished yet.
+
+`hallway-corner` 0.1.0 is described and validated here and is not released yet. It
+will be in the next minor release after its pull request merges; no simulator pins it
+yet.
 
 ## License
 
