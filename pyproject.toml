@@ -11,7 +11,7 @@ dev = [
     "jsonschema==4.26.0",
     "pytest==8.4.2",
     "ruff==0.17.5",
-    "zensical==0.0.73",
+    "zensical==0.1.1",
 ]
 
 [tool.uv]
