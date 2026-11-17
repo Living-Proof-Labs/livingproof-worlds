@@ -114,3 +114,35 @@ def test_draft_rendering_preserves_geometry_and_is_current():
             assert "end-west" in text and "end-north" in text
     assert "5.5 m" in expected["README.md"]
     assert render.readme_section_errors(expected["README.md"]) == []
+
+
+@pytest.mark.parametrize("direction", ["forward", "reverse"])
+@pytest.mark.parametrize("offset", [0, 0.5e-9])
+def test_non_adjacent_repeated_vertex(direction, offset):
+    world = copy.deepcopy(GOOD)
+    points = [[-3, 0, 0], [0, 0, 0], [-1, 0, 0], [offset, 0, 0], [0, 3, 0]]
+    traversal = next(t for t in world["traversals"] if t["name"] == direction)
+    place(world, traversal["route"])["points"] = points if direction == "forward" else points[::-1]
+    assert validate.schema_errors(world, draft=True) == []
+    assert "repeated point" in "\n".join(validate.validate(world, draft=True))
+
+
+def test_layout_repeated_vertex_fix_preserves_original_straight_format():
+    corner = json.loads((ROOT / "worlds/hallway-corner/0.1.0/world.json").read_text())
+    place(corner, "route-centreline")["points"] = [
+        [-3, 0, 0],
+        [0, 0, 0],
+        [-1, 0, 0],
+        [0, 0, 0],
+        [0, 3, 0],
+    ]
+    assert "repeated point" in "\n".join(validate.validate(corner))
+    straight = json.loads((ROOT / "worlds/hallway-open/0.1.0/world.json").read_text())
+    place(straight, "passage-centreline")["points"] = [
+        [-3, 0, 0],
+        [-1, 0, 0],
+        [-2, 0, 0],
+        [-1, 0, 0],
+        [3, 0, 0],
+    ]
+    assert validate.validate(straight) == []

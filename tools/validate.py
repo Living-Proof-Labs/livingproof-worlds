@@ -203,7 +203,9 @@ def layout_errors(world: dict, traversal: dict | None = None) -> list[str]:
     legs = list(itertools.pairwise(points))
     if any(abs(pt[2]) > EPS for pt in points):
         errors.append(f"INVALID {route_name}: must lie on the floor, z = 0")
-    if any(_dist(a, b) <= EPS for a, b in legs):
+    # Preserve the original straight-hallway checks; layout routes forbid any repeated vertex.
+    vertex_pairs = legs if world["format"] == STRAIGHT else itertools.combinations(points, 2)
+    if any(_dist(a, b) <= EPS for a, b in vertex_pairs):
         errors.append(f"INVALID {route_name}: repeated point")
         return errors
     if _dist(points[0], places[source]["reference"]) > tol:
