@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Living-Proof-Labs/robot-capability-specs/specs/worlds/world-traversals.schema.json",
+  "title": "livingproof-world-layout/0.2",
+  "description": "Neutral endpoint layout, world contract 0.4.0. Traversals explicitly bind existing segment, pose and polyline places. Reference and geometry consistency require traversalErrors.",
+  "type": "object",
+  "required": [
+    "id",
+    "content_version",
+    "units",
+    "dimensions",
+    "geometry",
+    "places",
+    "tolerances",
+    "traversals"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/name"
+    },
+    "content_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
+    },
+    "units": {
+      "const": "m"
+    },
+    "dimensions": {
+      "type": "object",
+      "required": [
+        "clear_width",
+        "wall_height",
+        "wall_thickness",
+        "floor_thickness"
+      ],
+      "properties": {
+        "clear_width": {
+          "$ref": "#/$defs/positive"
+        },
+        "wall_height": {
+          "$ref": "#/$defs/positive"
+        },
+        "wall_thickness": {
+          "$ref": "#/$defs/positive"
+        },
+        "floor_thickness": {
+          "$ref": "#/$defs/positive"
+        }
+      }
+    },
+    "geometry": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "description": "An axis-aligned box. There is no rotation field: a rotated or non-box shape is not part of this layout revision.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "type",
+          "role",
+          "centre",
+          "size"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/name"
+          },
+          "type": {
+            "const": "box"
+          },
+          "role": {
+            "enum": [
+              "floor",
+              "wall"
+            ]
+          },
+          "centre": {
+            "$ref": "#/$defs/vec3"
+          },
+          "size": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/positive"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "const": "floor"
+              }
+            }
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "const": "wall"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "places": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "segment",
+              "region",
+              "polyline",
+              "pose"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "required": [
+              "points",
+              "reference"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/name"
+              },
+              "type": {
+                "const": "segment"
+              },
+              "points": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/vec3"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "reference": {
+                "$ref": "#/$defs/vec3"
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/name"
+              },
+              "type": {
+                "const": "region"
+              },
+              "x": {
+                "$ref": "#/$defs/interval"
+              },
+              "y": {
+                "$ref": "#/$defs/interval"
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "required": [
+              "points"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/name"
+              },
+              "type": {
+                "const": "polyline"
+              },
+              "points": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/vec3"
+                },
+                "minItems": 2
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "required": [
+              "position",
+              "yaw_deg"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/name"
+              },
+              "type": {
+                "const": "pose"
+              },
+              "position": {
+                "$ref": "#/$defs/vec3"
+              },
+              "yaw_deg": {
+                "type": "number"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "tolerances": {
+      "type": "object",
+      "required": [
+        "distance_m",
+        "angle_deg"
+      ],
+      "properties": {
+        "distance_m": {
+          "$ref": "#/$defs/positive"
+        },
+        "angle_deg": {
+          "$ref": "#/$defs/positive"
+        }
+      }
+    },
+    "traversals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "from",
+          "start",
+          "route",
+          "finish"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/name"
+          },
+          "from": {
+            "$ref": "#/$defs/name"
+          },
+          "start": {
+            "$ref": "#/$defs/name"
+          },
+          "route": {
+            "$ref": "#/$defs/name"
+          },
+          "finish": {
+            "$ref": "#/$defs/name"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "positive": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "vec3": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "interval": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}

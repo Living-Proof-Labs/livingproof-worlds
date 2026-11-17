@@ -7,9 +7,10 @@
   "specification": {
     "repository": "Living-Proof-Labs/robot-capability-specs",
     "path": "specs/worlds/README.md",
-    "status": "unreleased",
     "document_revision": "0.4.0",
-    "world_contract_revision": "0.4.0"
+    "world_contract_revision": "0.4.0",
+    "tag": "v2.4.0",
+    "commit": "9723f8ba450921068739f72b8ad868f2c544df98"
   },
   "units": "m",
   "frame": {

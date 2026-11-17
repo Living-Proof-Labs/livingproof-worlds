@@ -30,9 +30,11 @@ nav:
       - Using and adding worlds: guide.md
       - Open hallway 0.1.0: worlds/hallway-open/0.1.0/index.md
       - Corner hallway 0.1.0: worlds/hallway-corner/0.1.0/index.md
+      - Reusable corner 0.2.0: worlds/hallway-corner/0.2.0/index.md
   - Reference:
       - Tasks: tasks.md
       - World contract: schema/world.schema.json
+      - Neutral traversal world contract: schema/world-0.3.schema.json
       - Release contract: schema/release.schema.json
   - Verification: index.md
   - Contribute: AGENTS.md

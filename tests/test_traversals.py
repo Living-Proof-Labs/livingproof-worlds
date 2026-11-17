@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import validate
 
-DRAFT = ROOT / "drafts/hallway-corner/0.2.0/world.json"
-GOOD = json.loads(DRAFT.read_text())
+WORLD_PATH = ROOT / "worlds/hallway-corner/0.2.0/world.json"
+GOOD = json.loads(WORLD_PATH.read_text())
 
 
 def place(world, name):
@@ -21,7 +21,7 @@ def place(world, name):
 
 def test_one_physical_fixture_two_directions():
     old = json.loads((ROOT / "worlds/hallway-corner/0.1.0/world.json").read_text())
-    assert validate.validate(GOOD, draft=True) == []
+    assert validate.validate(GOOD) == []
     assert GOOD["geometry"] == old["geometry"]
     assert GOOD["dimensions"] == old["dimensions"]
     assert place(GOOD, "route-reverse")["points"] == list(
@@ -43,7 +43,7 @@ def test_missing_or_wrong_references(key, value):
         del world["traversals"][0][key]
     else:
         world["traversals"][0][key] = value
-    assert validate.validate(world, draft=True)
+    assert validate.validate(world)
 
 
 @pytest.mark.parametrize(
@@ -62,7 +62,7 @@ def test_missing_or_wrong_references(key, value):
 def test_inconsistent_places(name, field, value, expected):
     world = copy.deepcopy(GOOD)
     place(world, name)[field] = value
-    assert expected in "\n".join(validate.validate(world, draft=True))
+    assert expected in "\n".join(validate.validate(world))
 
 
 @pytest.mark.parametrize(
@@ -78,37 +78,50 @@ def test_inconsistent_places(name, field, value, expected):
 def test_inconsistent_traversals(key, value, expected):
     world = copy.deepcopy(GOOD)
     world["traversals"][0][key] = value
-    assert expected in "\n".join(validate.validate(world, draft=True))
+    assert expected in "\n".join(validate.validate(world))
+
+
+def test_catalog_pin_and_manifest():
+    assert validate.validate(GOOD, WORLD_PATH) == []
+    assert WORLD_PATH in validate.world_files()
+    assert not (ROOT / "drafts/hallway-corner/0.2.0/world.json").exists()
+    assert GOOD["specification"]["tag"] == "v2.4.0"
+    assert GOOD["specification"]["commit"] == "9723f8ba450921068739f72b8ad868f2c544df98"
+    assert "status" not in GOOD["specification"]
+    for path in (ROOT / "schema").glob("world-0.3*.json"):
+        Draft202012Validator.check_schema(json.loads(path.read_text()))
 
 
 def test_release_catalog_rejects_unpublished_dependencies():
-    assert validate.validate(GOOD)
-    assert "unpublished" in validate.validate(GOOD, DRAFT, draft=True)[0]
-    assert DRAFT not in validate.world_files()
-    for path in (ROOT / "schema").glob("world-0.3*.json"):
-        Draft202012Validator.check_schema(json.loads(path.read_text()))
+    pending = copy.deepcopy(GOOD)
+    del pending["specification"]["tag"]
+    del pending["specification"]["commit"]
+    pending["specification"]["status"] = "unreleased"
+    assert validate.validate(pending)
+    assert validate.validate(pending, draft=True) == []
+    assert "unpublished" in validate.validate(pending, WORLD_PATH, draft=True)[0]
 
 
 def test_empty_traversals_and_duplicate_places_fail():
     world = copy.deepcopy(GOOD)
     world["traversals"] = []
-    assert validate.validate(world, draft=True)
+    assert validate.validate(world)
     world = copy.deepcopy(GOOD)
     world["places"].append(copy.deepcopy(world["places"][0]))
-    assert "unique" in "\n".join(validate.validate(world, draft=True))
+    assert "unique" in "\n".join(validate.validate(world))
 
 
-def test_draft_rendering_preserves_geometry_and_is_current():
+def test_catalog_rendering_preserves_geometry_and_is_current():
     import xml.etree.ElementTree as ET
 
     import render
 
     original = copy.deepcopy(GOOD)
-    expected = render.outputs(DRAFT.parent)
+    expected = render.outputs(WORLD_PATH.parent)
     assert GOOD == original
     assert len([name for name in expected if name.endswith(".svg")]) == 6
     for name, text in expected.items():
-        assert (DRAFT.parent / name).read_text() == text
+        assert (WORLD_PATH.parent / name).read_text() == text
         if name.endswith(".svg"):
             ET.fromstring(text)
             assert "end-west" in text and "end-north" in text
@@ -123,8 +136,8 @@ def test_non_adjacent_repeated_vertex(direction, offset):
     points = [[-3, 0, 0], [0, 0, 0], [-1, 0, 0], [offset, 0, 0], [0, 3, 0]]
     traversal = next(t for t in world["traversals"] if t["name"] == direction)
     place(world, traversal["route"])["points"] = points if direction == "forward" else points[::-1]
-    assert validate.schema_errors(world, draft=True) == []
-    assert "repeated point" in "\n".join(validate.validate(world, draft=True))
+    assert validate.schema_errors(world) == []
+    assert "repeated point" in "\n".join(validate.validate(world))
 
 
 def test_layout_repeated_vertex_fix_preserves_original_straight_format():
@@ -146,3 +159,16 @@ def test_layout_repeated_vertex_fix_preserves_original_straight_format():
         [3, 0, 0],
     ]
     assert validate.validate(straight) == []
+
+
+def test_world_conforms_to_released_specs_schema():
+    import hashlib
+
+    path = ROOT / "tests/fixtures/robot-capability-specs-v2.4.0-world-traversals.schema.json"
+    data = path.read_bytes()
+    # Released specs v2.4.0 at 9723f8ba450921068739f72b8ad868f2c544df98.
+    assert (
+        hashlib.sha256(data).hexdigest()
+        == "418399636192b77b069433fe8ae6d5f0c48a8dc1b1a38fdea47c9bb635250d65"
+    )
+    Draft202012Validator(json.loads(data)).validate(GOOD)

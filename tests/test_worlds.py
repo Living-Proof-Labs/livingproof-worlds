@@ -34,7 +34,11 @@ def test_schema_is_valid_draft_2020_12():
 
 def test_every_world_validates():
     corner = ROOT / "worlds" / "hallway-corner" / "0.1.0" / "world.json"
-    assert validate.world_files() == [corner, WORLD_PATH]
+    assert validate.world_files() == [
+        corner,
+        ROOT / "worlds/hallway-corner/0.2.0/world.json",
+        WORLD_PATH,
+    ]
     assert validate.main() == 0
 
 
