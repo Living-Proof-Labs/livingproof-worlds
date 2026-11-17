@@ -91,3 +91,10 @@ README-to-manual navigation, nested links and reload, desktop/mobile/keyboard
 navigation, search and opening a result, and root/source/help/license links.
 Then replace the pending README link and ask the directory owner to add the
 verified rendered destination. Artifact upload alone is not live acceptance.
+
+## Reusable corner
+
+[Corner hallway 0.2.0](../worlds/hallway-corner/0.2.0/README.md) provides neutral
+endpoints, inward spawns and explicit routes in both directions on the same
+physical fixture. It pins specs v2.4.0 / contract 0.4.0; consumers must support
+world format 0.3. Earlier world content and evidence remain unchanged.

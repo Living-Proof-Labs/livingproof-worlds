@@ -33,14 +33,17 @@ Equivalent geometry does not imply identical physics.
 | --- | --- | --- |
 | [`hallway-open`](worlds/hallway-open/0.1.0/world.json) | `0.1.0` | robot-capability-specs v1.3.0 `specs/worlds/hallways.md`, document revision 0.2.0 |
 | [`hallway-corner`](worlds/hallway-corner/0.1.0/world.json) | `0.1.0` | robot-capability-specs v2.2.2 `specs/worlds/README.md`, world contract revision 0.3.0 ("Any layout") |
+| [`hallway-corner`](worlds/hallway-corner/0.2.0/world.json) | `0.2.0` | robot-capability-specs v2.4.0 `specs/worlds/README.md`, world contract revision 0.4.0 (neutral endpoint traversals) |
 
 Each world lives at `worlds/<id>/<content_version>/` as `world.json` plus a
 `release.json` manifest. `task test` checks three layers, without running a simulator:
 
-1. **Schema:** [`schema/world.schema.json`](schema/world.schema.json) is closed, so an
+1. **Schema:** [`schema/world.schema.json`](schema/world.schema.json) covers formats
+   0.1 and 0.2; [`schema/world-0.3.schema.json`](schema/world-0.3.schema.json) covers
+   neutral traversals. Both are closed, so an
    unknown field, geometry type or place type fails with `UNSUPPORTED` instead
    of being ignored.
-2. **Semantic geometry:** every world meets the layout rules of the
+2. **Semantic geometry:** formats 0.1 and 0.2 meet the layout rules of the
    robot-capability-specs world contract 0.3.0 ("Any layout"). Floors and walls are
    axis-aligned boxes that do not overlap. `entrance` and `exit` are segments across
    the clear width. A route polyline runs from the entrance to the exit at least half
@@ -54,13 +57,17 @@ Each world lives at `worlds/<id>/<content_version>/` as `world.json` plus a
    has `+z` up with the floor top at `z = 0`, and a pose's yaw is in degrees,
    counterclockwise about `+z` from `+x`. A
    synthetic L-shaped test world in `tests/fixtures/worlds/` shows it validates.
+   Format `livingproof-world/0.3` uses contract 0.4.0: neutral endpoint segments
+   and named traversal tuples bind `from`, `start`, `route` and `finish`. Each
+   ordered route has distinct vertices and an inward-facing spawn strictly
+   inside its first leg. All traversals are validated; geometry stays shared.
 3. **Provenance:** every asset declares a licence, a source and a sha256, and
    `release.json` ([schema](schema/release.schema.json)) records the id, content
    version and the sha256 of every file, recomputed on each run. After an
    intended change in a new version directory, regenerate it with
    `python tools/validate.py --write-manifest worlds/<id>/<version>`.
 
-The second world, `hallway-corner`, is two 1.50 m hallways meeting at a right
+The original `hallway-corner` 0.1.0 content is two 1.50 m hallways meeting at a right
 angle, with a `corner` region where they meet and a three-point `route-centreline`.
 It is drawn and documented from `world.json` the same way, for the `walk-corner`
 scenario in
@@ -76,13 +83,17 @@ collisions with a simple test object; no robot or controller is involved.
 1. Make sure a spec in robot-capability-specs defines the world, then pin its tag
    and commit in `specification`.
 2. Create `worlds/<id>/<content_version>/world.json` that validates against
-   [`schema/world.schema.json`](schema/world.schema.json). Only add schema
+   the schema for its declared format (see above). Only add schema
    features that the spec needs; anything else must stay `UNSUPPORTED`.
 3. Write `notes.md` beside it with the hand-written sections `## Purpose`,
-   `## Changelog` and `## Simulator support`.
+   `## Changelog` and `## Simulator support` for formats 0.1/0.2. For format 0.3,
+   use the [reusable corner notes](worlds/hallway-corner/0.2.0/notes.md) as the
+   authoring example.
 4. Run `task render`. It generates `world.svg` and `README.md` (from
    [`tools/templates/world-README.md`](tools/templates/world-README.md)) and
-   rewrites `release.json` checksums. Commit all of them.
+   rewrites `release.json` checksums. Format 0.3 generates a separate SVG view
+   for each traversal from the same geometry. Commit all generated files, and
+   verify that every previously released directory remains byte-identical.
 5. Add tests for the spec's canonical values in `tests/`, then run `task check`
    and `task test`. `task check` fails if a README or SVG is missing, stale or
    lacks a section, or if `release.json` doesn't cover every file.
@@ -113,3 +124,11 @@ yet.
 ## License
 
 [Apache-2.0](LICENSE).
+
+## Reusable corner traversals
+
+[Corner hallway 0.2.0](worlds/hallway-corner/0.2.0/README.md) uses one physical
+fixture for both directions, with neutral endpoints and explicit traversal
+references. It consumes robot-capability-specs v2.4.0, contract revision 0.4.0.
+The existing 0.1.0 content remains unchanged. See the
+[reusable simple worlds authoring guidance](https://docs.livingprooflabs.com/collaboration-guidelines/docs/developer-interface.html#reusable-simple-worlds).
