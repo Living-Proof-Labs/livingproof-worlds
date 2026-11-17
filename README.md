@@ -113,3 +113,10 @@ yet.
 ## License
 
 [Apache-2.0](LICENSE).
+
+## Neutral endpoint authoring candidate
+
+The [corner 0.2.0 draft](drafts/hallway-corner/0.2.0/README.md) demonstrates one
+physical fixture serving both directions, pending the specs contract release.
+It is not in the released catalog. See the
+[reusable simple worlds authoring guidance](https://docs.livingprooflabs.com/collaboration-guidelines/docs/developer-interface.html#reusable-simple-worlds).

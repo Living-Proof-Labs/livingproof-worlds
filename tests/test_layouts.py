@@ -106,7 +106,7 @@ def place(world, name):
         (lambda w: w["places"].remove(place(w, "spawn-entrance")), "missing pose"),
         (lambda w: place(w, "route-centreline").update(name="passage-centreline"), "missing"),
         (lambda w: w["dimensions"].update(length=6.0), "INVALID dimensions"),
-        (lambda w: w.update(format="livingproof-world/0.3"), "INVALID format"),
+        (lambda w: w.update(format="livingproof-world/9.9"), "INVALID format"),
         (
             lambda w: w["geometry"][5].update(centre=[-0.825, 1.875, 1.25], size=[0.15, 2.25, 2.5]),
             "overlaps",

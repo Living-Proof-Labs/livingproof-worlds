@@ -40,8 +40,12 @@ def _label(error) -> str:
     return "/".join(str(p) for p in error.absolute_path) or "<root>"
 
 
-def schema_errors(world: dict) -> list[str]:
-    validator = Draft202012Validator(SCHEMA)
+def schema_errors(world: dict, *, draft: bool = False) -> list[str]:
+    schema = SCHEMA
+    if world.get("format") == "livingproof-world/0.3":
+        name = "world-0.3-draft.schema.json" if draft else "world-0.3.schema.json"
+        schema = json.loads((ROOT / "schema" / name).read_text())
+    validator = Draft202012Validator(schema)
     messages = []
     for error in sorted(validator.iter_errors(world), key=lambda e: list(e.absolute_path)):
         if error.validator == "additionalProperties":
@@ -82,6 +86,8 @@ def geometry_errors(world: dict) -> list[str]:
     names = [g["name"] for g in world["geometry"]] + [p["name"] for p in world["places"]]
     if len(names) != len(set(names)):
         return ["INVALID names: geometry and place names must be unique"]
+    if world["format"] == "livingproof-world/0.3":
+        return traversal_errors(world)
     errors = straight_hallway_errors(world) if world["format"] == STRAIGHT else []
     return errors + [e for e in layout_errors(world) if e not in errors]
 
@@ -146,7 +152,7 @@ def route_length(world: dict, route: str, start: str = "spawn-entrance") -> floa
     return length - station
 
 
-def layout_errors(world: dict) -> list[str]:
+def layout_errors(world: dict, traversal: dict | None = None) -> list[str]:
     """Rules for any layout of axis-aligned walls (specs world contract 0.3.0)."""
     errors = []
     d = world["dimensions"]
@@ -167,8 +173,15 @@ def layout_errors(world: dict) -> list[str]:
             errors.append(f"UNSUPPORTED role {g['role']!r} for {g['name']}")
     errors += _overlap_errors(world["geometry"])
     places = {p["name"]: p for p in world["places"]}
-    route_name = ROUTE[world["format"]]
-    required = {**REQUIRED_PLACES, route_name: "polyline"}
+    traversal = traversal or {
+        "from": "entrance",
+        "finish": "exit",
+        "start": "spawn-entrance",
+        "route": ROUTE[world["format"]],
+    }
+    source, finish, start = traversal["from"], traversal["finish"], traversal["start"]
+    route_name = traversal["route"]
+    required = {source: "segment", finish: "segment", start: "pose", route_name: "polyline"}
     for name, kind in required.items():
         if name not in places:
             errors.append(f"INVALID places: missing {kind} {name!r}")
@@ -176,7 +189,7 @@ def layout_errors(world: dict) -> list[str]:
             errors.append(f"INVALID {name}: must be a {kind}")
     if errors:
         return errors
-    for name in ("entrance", "exit"):
+    for name in (source, finish):
         (x0, y0, z0), (x1, y1, z1) = places[name]["points"]
         ref = places[name]["reference"]
         if abs(z0) > EPS or abs(z1) > EPS or abs(ref[2]) > EPS:
@@ -193,10 +206,10 @@ def layout_errors(world: dict) -> list[str]:
     if any(_dist(a, b) <= EPS for a, b in legs):
         errors.append(f"INVALID {route_name}: repeated point")
         return errors
-    if _dist(points[0], places["entrance"]["reference"]) > tol:
-        errors.append(f"INVALID {route_name}: must start at the entrance reference point")
-    if _dist(points[-1], places["exit"]["reference"]) > tol:
-        errors.append(f"INVALID {route_name}: must end at the exit reference point")
+    if _dist(points[0], places[source]["reference"]) > tol:
+        errors.append(f"INVALID {route_name}: must start at the {source} reference point")
+    if _dist(points[-1], places[finish]["reference"]) > tol:
+        errors.append(f"INVALID {route_name}: must end at the {finish} reference point")
     for w in walls:
         if any(_leg_to_box(a, b, w) < half_w - tol for a, b in legs):
             errors.append(f"INVALID {route_name}: passes closer than clear_width/2 to {w['name']}")
@@ -205,10 +218,10 @@ def layout_errors(world: dict) -> list[str]:
             gap = min((_point_to_box(p["position"], w) for w in walls), default=math.inf)
             if gap < SPAWN_CLEARANCE - EPS:
                 errors.append(f"INVALID {p['name']}: spawn closer than 0.25 m to a wall")
-    spawn = places["spawn-entrance"]
+    spawn = places[start]
     dist, station, _ = route_station(route, spawn["position"])
     if dist > tol:
-        errors.append(f"INVALID spawn-entrance: must lie on {route_name}")
+        errors.append(f"INVALID {start}: must lie on {route_name}")
     else:
         walked = 0.0
         for a, b in legs:
@@ -216,9 +229,59 @@ def layout_errors(world: dict) -> list[str]:
                 heading = math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
                 diff = abs((spawn["yaw_deg"] - heading + 180) % 360 - 180)
                 if diff > ang_tol:
-                    errors.append(f"INVALID spawn-entrance: must face along {route_name}")
+                    errors.append(f"INVALID {start}: must face along {route_name}")
                 break
             walked += _dist(a, b)
+    return errors
+
+
+def traversal_errors(world: dict) -> list[str]:
+    """Validate every declared traversal, using existing place primitives."""
+    errors = []
+    places = {p["name"]: p for p in world["places"]}
+    names = [t["name"] for t in world["traversals"]]
+    if len(names) != len(set(names)):
+        errors.append("INVALID traversals: names must be unique")
+    for t in world["traversals"]:
+        missing = False
+        for key, kind in {
+            "from": "segment",
+            "finish": "segment",
+            "start": "pose",
+            "route": "polyline",
+        }.items():
+            if places.get(t[key], {}).get("type") != kind:
+                errors.append(f"INVALID {t['name']}: {key} must reference a {kind}: {t[key]}")
+                missing = True
+        if missing:
+            continue
+        if t["from"] == t["finish"]:
+            errors.append(f"INVALID {t['name']}: endpoints must be distinct")
+        errors.extend(f"{t['name']}: {e}" for e in layout_errors(world, t))
+        route, spawn = places[t["route"]], places[t["start"]]
+        points = route["points"]
+        if any(_dist(a, b) <= EPS for a, b in itertools.pairwise(points)):
+            continue
+        _, station, _ = route_station(route, spawn["position"])
+        if abs(spawn["position"][2]) > EPS or not EPS < station < _dist(points[0], points[1]) - EPS:
+            errors.append(
+                f"INVALID {t['name']}: start must lie strictly inside the first route leg on the floor"
+            )
+        for endpoint, a, b in (
+            (t["from"], points[0], points[1]),
+            (t["finish"], points[-2], points[-1]),
+        ):
+            e0, e1 = places[endpoint]["points"]
+            edge, leg = (e1[0] - e0[0], e1[1] - e0[1]), (b[0] - a[0], b[1] - a[1])
+            denominator = math.hypot(*edge) * math.hypot(*leg)
+            if denominator <= EPS:
+                errors.append(f"INVALID {endpoint}: endpoint segment has zero length")
+                continue
+            deviation = math.degrees(
+                math.asin(min(1, abs(sum(x * y for x, y in zip(edge, leg))) / denominator))
+            )
+            if deviation > world["tolerances"]["angle_deg"]:
+                errors.append(f"INVALID {t['name']}: {endpoint} must be perpendicular to route")
     return errors
 
 
@@ -285,8 +348,10 @@ def straight_hallway_errors(world: dict) -> list[str]:
     return errors
 
 
-def validate(world: dict, path: Path | None = None) -> list[str]:
-    errors = schema_errors(world)
+def validate(world: dict, path: Path | None = None, *, draft: bool = False) -> list[str]:
+    if draft and path is not None:
+        return ["INVALID draft: unpublished dependencies cannot enter the release catalog"]
+    errors = schema_errors(world, draft=draft)
     if (
         path is not None
         and not errors

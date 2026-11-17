@@ -806,6 +806,10 @@ def readme_section_errors(text: str) -> list[str]:
 
 def outputs(directory: Path) -> dict[str, str]:
     world = json.loads((directory / "world.json").read_text())
+    if world["format"] == "livingproof-world/0.3":
+        from render_traversals import outputs as neutral_outputs
+
+        return neutral_outputs(world, directory)
     return {
         "world.svg": render_svg(world, "auto"),
         "world-light.svg": render_svg(world, "light"),
@@ -843,6 +847,23 @@ def world_dirs() -> list[Path]:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    if argv in (["--drafts"], ["--drafts", "--check"]):
+        failed = False
+        for path in sorted((ROOT / "drafts").glob("*/*/world.json")):
+            errors = validate.validate(json.loads(path.read_text()), draft=True)
+            if errors:
+                print("\n".join(errors), file=sys.stderr)
+                failed = True
+                continue
+            for name, text in outputs(path.parent).items():
+                target = path.parent / name
+                if "--check" in argv:
+                    if not target.is_file() or target.read_text() != text:
+                        print(f"{target}: stale or missing", file=sys.stderr)
+                        failed = True
+                else:
+                    target.write_text(text)
+        return int(failed)
     if argv == ["--check"]:
         errors = check(world_dirs())
         for e in errors:

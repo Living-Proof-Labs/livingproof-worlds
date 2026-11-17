@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 619" width="800" height="619" role="img" aria-labelledby="hallway-corner-0-2-0-title hallway-corner-0-2-0-desc">
+<title id="hallway-corner-0-2-0-title">Corner hallway — reverse traversal, hallway-corner 0.2.0: top-down diagram</title>
+<desc id="hallway-corner-0-2-0-desc">Top-down diagram of hallway-corner 0.2.0: 2 hallways 1.50 m clear between 0.15 m walls, along a 6.00 m route route-reverse through (0.00, 3.00), (0.00, 0.00), (-3.00, 0.00). Entrance (IN) at (0.00, 3.00), end-west (OUT) at (-3.00, 0.00). Region corner from x = -0.75 to 0.75 m, y = -0.75 to 0.75 m. Spawns: spawn-west at (-2.50, 0.00) yaw 0°; spawn-north at (0.00, 2.50) yaw -90°.</desc>
+<style>:root{--bg:#ffffff;--text:#0f172a;--muted:#475569;--wall:#475569;--floor:#f1f5f9;--dim:#475569;--teal:#0f766e;--amber:#b45309;--spawn:#1d4ed8}text{font-family:'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;fill:var(--text);font-size:12px}.title{font-family:'Instrument Serif', Georgia, 'Times New Roman', serif;font-size:18px}.muted{fill:var(--muted)}.dimtext{font-size:13px;fill:var(--muted)}.wall{fill:var(--wall)}.floor{fill:var(--floor)}.passage{fill:var(--teal);fill-opacity:.10;stroke:var(--teal);stroke-dasharray:6 4}.centre{stroke:var(--teal);stroke-width:1.5;stroke-dasharray:2 4;fill:none}.end-north{fill:var(--teal)}.end-west{stroke:var(--amber);stroke-width:6;stroke-dasharray:10 6}.tag-in{fill:var(--teal);font-weight:700}.tag-out{fill:var(--amber);font-weight:700}.spawn{fill:var(--spawn)}.yaw{fill:var(--spawn);stroke:var(--bg);stroke-width:3;paint-order:stroke;stroke-linejoin:round}.leader{stroke:var(--muted);stroke-width:1;fill:none}.dim{stroke:var(--dim);stroke-width:1;fill:none}.axis{stroke:var(--text);stroke-width:1.5;fill:none}.axishead{fill:var(--text)}</style>
+<text class="title" x="16.0" y="34.0">Corner hallway — reverse traversal · hallway-corner 0.2.0 · top view</text>
+<rect class="wall" x="16.0" y="51.0" width="16" height="8"/>
+<text x="38.0" y="60.0">wall</text>
+<rect class="passage" x="84.8" y="51.0" width="16" height="8"/>
+<text x="106.8" y="60.0">corner</text>
+<line class="centre" x1="168.0" y1="56.0" x2="184.0" y2="56.0"/>
+<text x="190.0" y="60.0">route-reverse</text>
+<rect class="end-north" x="329.2" y="51.0" width="5" height="10"/>
+<text x="345.2" y="60.0">IN end-north</text>
+<line class="end-west" x1="450.4" y1="51.0" x2="450.4" y2="61.0"/>
+<text x="464.4" y="60.0">OUT end-west</text>
+<circle class="spawn" cx="548.0" cy="56.0" r="4"/>
+<text x="562.0" y="60.0">spawn + yaw</text>
+<rect class="floor" x="212.8" y="331.6" width="374.4" height="172.8"/>
+<rect class="floor" x="414.4" y="130.0" width="172.8" height="201.6"/>
+<rect class="wall" x="212.8" y="490.0" width="374.4" height="14.4"/>
+<rect class="wall" x="572.8" y="130.0" width="14.4" height="360.0"/>
+<rect class="wall" x="212.8" y="331.6" width="216.0" height="14.4"/>
+<rect class="wall" x="414.4" y="130.0" width="14.4" height="201.6"/>
+<rect class="passage" x="428.8" y="346.0" width="144.0" height="144.0"/>
+<text class="muted" text-anchor="middle" x="500.8" y="440.2">corner</text>
+<polyline class="centre" points="500.8,130.0 500.8,418.0 212.8,418.0"/>
+<polygon class="end-north" points="428.8,127.0 428.8,133.0 572.8,133.0 572.8,127.0"/>
+<text class="tag-in" text-anchor="middle" x="500.8" y="120.0">IN</text>
+<line class="end-west" x1="212.8" y1="490.0" x2="212.8" y2="346.0"/>
+<text class="tag-out" text-anchor="end" x="202.8" y="422.2">OUT</text>
+<line class="dim" x1="176.8" y1="490.0" x2="176.8" y2="346.0"/>
+<line class="dim" x1="181.8" y1="490.0" x2="171.8" y2="490.0"/>
+<line class="dim" x1="181.8" y1="346.0" x2="171.8" y2="346.0"/>
+<text class="dimtext" x="184.8" y="494.6">1.50 m clear</text>
+<polygon class="yaw" points="266.8,421.0 280.8,421.0 280.8,427.0 290.8,418.0 280.8,409.0 280.8,415.0 266.8,415.0"/>
+<circle class="spawn" cx="260.8" cy="418.0" r="6"/>
+<line class="leader" x1="260.8" y1="418.0" x2="260.8" y2="518.4"/>
+<text x="142.0" y="530.4">spawn-west (-2.50, 0.00) · yaw 0°</text>
+<polygon class="yaw" points="497.8,184.0 497.8,198.0 491.8,198.0 500.8,208.0 509.8,198.0 503.8,198.0 503.8,184.0"/>
+<circle class="spawn" cx="500.8" cy="178.0" r="6"/>
+<line class="leader" x1="500.8" y1="178.0" x2="500.8" y2="538.4"/>
+<text x="374.8" y="550.4">spawn-north (0.00, 2.50) · yaw -90°</text>
+<line class="axis" x1="20.0" y1="598.4" x2="42.0" y2="598.4"/>
+<line class="axis" x1="20.0" y1="598.4" x2="20.0" y2="576.4"/>
+<polygon class="axishead" points="48.0,598.4 41.0,594.4 41.0,602.4"/>
+<polygon class="axishead" points="20.0,570.4 16.0,577.4 24.0,577.4"/>
+<text x="51.0" y="602.4">+x</text>
+<text x="27.0" y="574.4">+y</text>
+<text class="dimtext" text-anchor="middle" x="400.0" y="602.4">route-reverse: 6.00 m from end-north to end-west</text>
+</svg>

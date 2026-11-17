@@ -21,6 +21,7 @@ tasks:
     desc: Fail if a world README or SVG is missing, lacks a section or is stale
     cmds:
       - uv run --locked --no-sync python tools/render.py --check
+      - uv run --locked --no-sync python tools/render.py --drafts --check
   check:manifest:
     desc: Fail if release.json checksums do not cover every world file
     cmds:
