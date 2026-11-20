@@ -106,7 +106,7 @@ def build():
         license_path = REPO + "/blob/" + commit + "/LICENSE"
         text += (
             f"\n\n---\n\n[Documentation home](https://docs.livingprooflabs.com/) · "
-            f"[Docs: development · {commit[:12]}]({source_link}) · "
+            f'[Docs: development]({source_link} "{commit}") · '
             f"[Version and source]({version}) · [Help / report an issue]({REPO}/issues) · "
             f"[License]({license_path})\n"
         )
@@ -155,7 +155,7 @@ def build():
         "# Version and source\n\nThis is development documentation, not a package release. "
         "Historical rendered manuals are not maintained; use the matching "
         f"[published source tag]({REPO}/tags) for an adopted release.\n\n"
-        f"[Docs: development · {commit[:12]}]({source_link}); dirty checkout: **{str(dirty).lower()}**. "
+        f'[Docs: development]({source_link} "{commit}"); dirty checkout: **{str(dirty).lower()}**. '
         "A dirty preview has changes beyond that commit; source hashes below identify its inputs.\n\n"
         f"Guidelines and recipe: [{BASELINE}](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/{BASELINE}), resolved to `{BASELINE_SHA}`. "
         "This is a released guidance dependency, not the version of this development manual. "
@@ -167,7 +167,7 @@ def build():
         docs_dir="source",
         site_dir="html",
         repo_url=source_link,
-        repo_name=f"Source · dev {commit[:12]}",
+        repo_name="Source · development",
     )
     (OUT / "mkdocs.yml").write_text(yaml.safe_dump(config, sort_keys=False))
     subprocess.run(
