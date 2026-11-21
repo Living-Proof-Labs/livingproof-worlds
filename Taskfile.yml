@@ -3,7 +3,7 @@
 version: '3'
 vars:
   # renovate: guidelines
-  GUIDELINES_VERSION: 'v9.7.6'
+  GUIDELINES_VERSION: 'v9.7.9'
 tasks:
   default:
     desc: Show available commands
