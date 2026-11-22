@@ -7,6 +7,11 @@ services:
         APT_MIRROR: "${APT_MIRROR:-}"
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     working_dir: /workspace/worlds
+    environment:
+      - SOURCE_COMMIT
+      - MANUAL_VERSION
+      - GITHUB_RUN_ID
+      - GITHUB_RUN_ATTEMPT
     volumes:
       - .:/workspace/worlds
       - worlds-venv:/opt/worlds-venv

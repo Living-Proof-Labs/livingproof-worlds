@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+from importlib.metadata import version as package_version
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import urlopen
@@ -23,6 +24,8 @@ OUT = ROOT / "artifacts/manual"
 REPO = "https://github.com/Living-Proof-Labs/livingproof-worlds"
 BASELINE = "v7.8.2"
 BASELINE_SHA = "1470bd46deffd62d6badf568996225e56872258a"
+NUMBER = r"(?:0|[1-9][0-9]*)"
+VERSION = rf"{NUMBER}\.{NUMBER}\.{NUMBER}(?:-(?:pr\.[1-9][0-9]*|main)\.[1-9][0-9]*\.[1-9][0-9]*)?"
 
 
 def run(*args):
@@ -33,6 +36,13 @@ def build():
     commit = os.environ.get("SOURCE_COMMIT") or run("git", "rev-parse", "HEAD")
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Expected an exact source commit")
+    version = os.environ.get("MANUAL_VERSION")
+    if version is None:
+        version = "development"
+    elif len(version) > 256 or not re.fullmatch(VERSION, version):
+        raise ValueError("Expected the shared SemVer build version")
+    run_id = os.environ.get("GITHUB_RUN_ID")
+    run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT")
     dirty_value = os.environ.get("SOURCE_DIRTY")
     if dirty_value is not None and dirty_value not in ("true", "false"):
         raise ValueError("SOURCE_DIRTY must be true or false")
@@ -54,15 +64,14 @@ def build():
     mapping["docs/manual.md"] = "index.md"
     record = {
         "source_commit": commit,
+        "version": version,
+        "run_id": run_id,
+        "run_attempt": run_attempt,
         "source_dirty": dirty,
         "guidelines_baseline": BASELINE,
         "guidelines_baseline_commit": BASELINE_SHA,
-        "generator": "zensical==0.0.73",
-        "workflow_run": (
-            REPO + "/actions/runs/" + os.environ["GITHUB_RUN_ID"]
-            if os.environ.get("GITHUB_RUN_ID")
-            else None
-        ),
+        "generator": f"zensical=={package_version('zensical')}",
+        "workflow_run": (REPO + f"/actions/runs/{run_id}" if run_id else None),
         "sources": {},
     }
     source_link = REPO + "/tree/" + commit
@@ -102,12 +111,12 @@ def build():
         text = re.sub(r"\]\(([^)\s]+)\)", rewrite, text)
         target = source / destination
         target.parent.mkdir(parents=True, exist_ok=True)
-        version = posixpath.relpath("version.md", posixpath.dirname(destination) or ".")
+        version_path = posixpath.relpath("version.md", posixpath.dirname(destination) or ".")
         license_path = REPO + "/blob/" + commit + "/LICENSE"
         text += (
             f"\n\n---\n\n[Documentation home](https://docs.livingprooflabs.com/) · "
-            f'[Docs: development]({source_link} "{commit}") · '
-            f"[Version and source]({version}) · [Help / report an issue]({REPO}/issues) · "
+            f'[Docs: {version}]({source_link} "{commit}") · '
+            f"[Version and source]({version_path}) · [Help / report an issue]({REPO}/issues) · "
             f"[License]({license_path})\n"
         )
         target.write_text(text)
@@ -152,13 +161,15 @@ def build():
     record["brand"] = lock
     (source / "build.json").write_text(json.dumps(record, indent=2) + "\n")
     (source / "version.md").write_text(
-        "# Version and source\n\nThis is development documentation, not a package release. "
-        "Historical rendered manuals are not maintained; use the matching "
+        "# Version and source\n\n"
+        f"Manual build version: **{version}**. This is not a package release. "
+        "Development and prerelease builds are previews; a build version alone does not "
+        "establish a published release. Historical rendered manuals are not maintained; use the matching "
         f"[published source tag]({REPO}/tags) for an adopted release.\n\n"
-        f'[Docs: development]({source_link} "{commit}"); dirty checkout: **{str(dirty).lower()}**. '
+        f'[Docs: {version}]({source_link} "{commit}"); dirty checkout: **{str(dirty).lower()}**. '
         "A dirty preview has changes beyond that commit; source hashes below identify its inputs.\n\n"
         f"Guidelines and recipe: [{BASELINE}](https://github.com/Living-Proof-Labs/collaboration-guidelines/tree/{BASELINE}), resolved to `{BASELINE_SHA}`. "
-        "This is a released guidance dependency, not the version of this development manual. "
+        "This is a released guidance dependency, not the version of this manual. "
         f"[Published world releases]({REPO}/releases) are separate.\n\n"
         "```json\n" + json.dumps(record, indent=2) + "\n```\n\n[Build record](build.json)\n"
     )
@@ -167,7 +178,7 @@ def build():
         docs_dir="source",
         site_dir="html",
         repo_url=source_link,
-        repo_name="Source · development",
+        repo_name=f"Source · {version}",
     )
     (OUT / "mkdocs.yml").write_text(yaml.safe_dump(config, sort_keys=False))
     subprocess.run(

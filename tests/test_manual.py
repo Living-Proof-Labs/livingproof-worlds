@@ -3,6 +3,7 @@
 
 import importlib.util
 import json
+import os
 import re
 from html.parser import HTMLParser
 from pathlib import Path
@@ -34,7 +35,12 @@ def test_source_identity_and_task_reference():
     record = json.loads((SITE / "build.json").read_text())
     assert len(record["source_commit"]) == 40
     assert record["brand"] == json.loads((ROOT / "docs-brand.lock.json").read_text())
-    assert record["source_commit"] in (SITE / "version.html").read_text()
+    version_page = (SITE / "version.html").read_text()
+    assert record["source_commit"] in version_page
+    assert f"<strong>{record['version']}</strong>" in version_page
+    assert record["version"] == os.environ.get("MANUAL_VERSION", "development")
+    assert record["run_id"] == os.environ.get("GITHUB_RUN_ID")
+    assert record["run_attempt"] == os.environ.get("GITHUB_RUN_ATTEMPT")
     tasks = (SITE / "tasks.html").read_text()
     assert "manual:verify" in tasks
     assert "Prepared container" in tasks
@@ -137,7 +143,7 @@ class HeaderFooterInspector(VisibleHTMLParser):
             self.in_footer -= 1
         if tag == "a" and self.in_link:
             text = "".join(self.link_text).strip()
-            if text.startswith("Docs: development"):
+            if text.startswith("Docs: "):
                 self.docs_links.append(
                     (text, self.link_attrs.get("href", ""), self.link_attrs.get("title", ""))
                 )
@@ -158,18 +164,19 @@ class HeaderFooterInspector(VisibleHTMLParser):
 def test_no_sha_in_header_or_footer_visible_text():
     record = json.loads((SITE / "build.json").read_text())
     commit = record["source_commit"]
+    version = record["version"]
     sha_pattern = commit_pattern(commit)
     for path in SITE.rglob("*.html"):
         inspector = HeaderFooterInspector()
         inspector.feed(path.read_text())
         repo_text = "".join(inspector.source_repos).strip()
-        assert "Source · development" in repo_text, path
+        assert f"Source · {version}" in repo_text, path
         assert not sha_pattern.search(repo_text), (path, repo_text)
         assert any(commit in href for href in inspector.source_links), path
         footer_text = " ".join(inspector.footer_text)
         assert not sha_pattern.search(footer_text), (path, footer_text)
         for text, href, title in inspector.docs_links:
-            assert text == "Docs: development", (path, text)
+            assert text == f"Docs: {version}", (path, text)
             assert not sha_pattern.search(text), (path, text)
             assert commit in href, (path, href)
             assert commit in title, (path, title)

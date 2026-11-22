@@ -60,9 +60,10 @@ The manual build stages canonical Markdown, world JSON, schemas and diagrams;
 it does not regenerate or modify released world content. Contributor commands
 are generated using native Task list and summary output, without executing task
 bodies. The Version and source page records the exact documentation commit,
-dirty-preview status, source hashes and workflow run. This is development
-documentation; historical rendered manuals are not maintained. Published source
-tags remain available for older releases.
+build version, dirty-preview status, source hashes, workflow run and attempt.
+Local builds use the development label. Pull request builds use the planned
+prerelease build version and are never published. Historical rendered manuals
+are not maintained; published source tags remain available for older releases.
 
 Manual checks cover local HTML links and fragments, shared branding on every
 page, source identity, diagram availability and generated Task reference.
@@ -75,11 +76,18 @@ API or public application CLI to invent a reference for.
 
 Expected URL: `https://docs.livingprooflabs.com/livingproof-worlds/`.
 This is a deployment target, not a verified live-site claim.
-The repository manual workflow builds and checks pull requests with read-only
-permissions, then publishes only trusted main builds through a separate Pages
-job. Deployment rejects a stale main revision while holding the deployment lock.
-Only that job receives Pages and identity-token write permissions; it does not
-check out or run project code.
+Worlds verification uses the same read-only manual build for pull requests
+to main, main pushes and an explicit delivery retry. On main, the release writer waits
+for world verification and the sealed manual. Pages verifies the published
+stable release, exact current main commit and sealed bytes from that attempt
+before delivery. Only the Pages job receives Pages and identity-token write
+permissions; it does not check out or run project code.
+
+If delivery fails after a release has been published, retry **Worlds
+verification** on **main** with the exact existing release tag. This rebuilds
+the same source and version for the new attempt without retagging. A failed-job
+only rerun does not reuse an older attempt's build. Without a matching release,
+a replay cannot publish.
 
 Prerequisites are Pages configured for GitHub Actions and a `github-pages`
 environment restricted to main. No settings are changed by this PR. The existing

@@ -366,7 +366,7 @@ def _workflow_texts() -> list[tuple[str, str]]:
 
 
 def _deploy_guard() -> tuple[str, dict[str, str], list[str]]:
-    text = (WORKFLOWS / "manual.yml").read_text()
+    text = (WORKFLOWS / "verify.yml").read_text()
     deploy = next(job for job in _extract_jobs(text) if job["name"] == "deploy")
     job_lines = deploy["lines"]
     assert isinstance(job_lines, list)
@@ -379,7 +379,8 @@ def _deploy_guard() -> tuple[str, dict[str, str], list[str]]:
             env[entry["name"]] = "workflow-token"
         elif entry["name"] == "CANDIDATE":
             env[entry["name"]] = EXPECTED_SHA
-    return script, env, steps[1]
+    deploy_step = next(step for step in steps if "actions/deploy-pages@" in "\n".join(step))
+    return script, env, deploy_step
 
 
 def _run_guard(
@@ -417,13 +418,13 @@ def test_repository_workflows_authenticate_every_main_freshness_read():
             calls.append(name)
         problems.extend(freshness_problems(name, text))
     assert problems == [], "\n".join(problems)
-    assert calls == ["manual.yml"]
+    assert calls == ["verify.yml"]
     script, env, deploy_step = _deploy_guard()
     assert env["GH_TOKEN"] == "workflow-token"
     assert env["CANDIDATE"] == EXPECTED_SHA
     assert GH_API.search(script)
     assert FRESHNESS in script
-    text = (WORKFLOWS / "manual.yml").read_text()
+    text = (WORKFLOWS / "verify.yml").read_text()
     deploy = next(job for job in _extract_jobs(text) if job["name"] == "deploy")
     job_lines = deploy["lines"]
     assert isinstance(job_lines, list)
@@ -468,7 +469,7 @@ def test_contents_write_fails_even_when_the_read_sends_a_token():
 
 
 def test_removing_the_manual_workflow_token_fails():
-    text = (WORKFLOWS / "manual.yml").read_text()
+    text = (WORKFLOWS / "verify.yml").read_text()
     stripped = "".join(
         line
         for line in text.splitlines(keepends=True)

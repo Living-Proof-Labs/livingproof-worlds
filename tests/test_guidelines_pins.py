@@ -26,8 +26,26 @@ USES = re.compile(
     re.MULTILINE,
 )
 PRESET = re.compile(rf"^github>{REPO}:renovate-preset#(?P<ref>.+)$")
-SHARED_RELEASE_INPUTS = {"dry-run", "draft-release"}
-SHARED_RELEASE_OUTPUTS = {"draft-created", "published", "version", "git-tag", "release-url"}
+SHARED_RELEASE_INPUTS = {"dry-run", "draft-release", "expected-version", "expected-commit"}
+SHARED_RELEASE_OUTPUTS = {
+    "draft-created",
+    "published",
+    "version",
+    "git-tag",
+    "release-url",
+    "commit",
+}
+SHARED_CANDIDATE_INPUTS = {"replay-tag"}
+SHARED_CANDIDATE_OUTPUTS = {
+    "semver-version",
+    "pep440-version",
+    "debian-version",
+    "version",
+    "git-tag",
+    "commit",
+    "run-id",
+    "run-attempt",
+}
 
 
 def _root() -> Path:
@@ -123,7 +141,7 @@ def test_workflow_call_and_renovate_preset_name_one_guidelines_release():
 )
 def test_mismatched_pins_are_reported():
     text = workflow_path().read_text()
-    mutated = USES.sub(lambda m: m.group(0).replace(m.group("ref"), "v2.2.0", 1), text, count=1)
+    mutated = USES.sub(lambda m: m.group(0).replace(m.group("ref"), "v2.2.0", 1), text)
     preset = {"extends": [f"github>{REPO}:renovate-preset#v9.2.0"]}
     assert len(pinned_versions(mutated, preset)) == 2
 
@@ -137,12 +155,19 @@ def test_release_call_uses_only_the_shared_interface():
     calls = guideline_calls(text)
     assert calls, "expected a job that uses the shared semantic-release workflow"
     for name, match in calls.items():
-        assert match.group("file") == "semantic-release.yml"
+        workflow_file = match.group("file")
+        assert workflow_file in {"semantic-release.yml", "semantic-release-candidate.yml"}
         block = _job_block(text, name)
-        assert set(_mapping(block, "with")) <= SHARED_RELEASE_INPUTS
-        assert _mapping(block, "permissions").get("contents") == "write"
-        used = set(re.findall(rf"needs\.{re.escape(name)}\.outputs\.([\w-]+)", text))
-        assert used <= SHARED_RELEASE_OUTPUTS, sorted(used - SHARED_RELEASE_OUTPUTS)
+        if workflow_file == "semantic-release.yml":
+            assert set(_mapping(block, "with")) <= SHARED_RELEASE_INPUTS
+            assert _mapping(block, "permissions").get("contents") == "write"
+            used = set(re.findall(rf"needs\.{re.escape(name)}\.outputs\.([\w-]+)", text))
+            assert used <= SHARED_RELEASE_OUTPUTS, sorted(used - SHARED_RELEASE_OUTPUTS)
+        else:
+            assert set(_mapping(block, "with")) <= SHARED_CANDIDATE_INPUTS
+            assert _mapping(block, "permissions").get("contents") == "read"
+            used = set(re.findall(rf"needs\.{re.escape(name)}\.outputs\.([\w-]+)", text))
+            assert used <= SHARED_CANDIDATE_OUTPUTS, sorted(used - SHARED_CANDIDATE_OUTPUTS)
 
 
 @pytest.mark.skipif(
@@ -167,10 +192,16 @@ def test_an_unknown_release_output_is_reported():
     workflow_path() is None, reason="this repository has no guidelines workflow call"
 )
 def test_recorded_interface_matches_the_pinned_shared_workflow():
-    refs = {match.group("ref") for match in guideline_calls().values()}
-    (ref,) = refs
-    url = f"https://raw.githubusercontent.com/{REPO}/{ref}/.github/workflows/semantic-release.yml"
-    with urllib.request.urlopen(url, timeout=30) as response:
-        shared = response.read().decode()
-    assert _workflow_call_keys(shared, "inputs") == SHARED_RELEASE_INPUTS
-    assert _workflow_call_keys(shared, "outputs") == SHARED_RELEASE_OUTPUTS
+    interfaces = {
+        "semantic-release.yml": (SHARED_RELEASE_INPUTS, SHARED_RELEASE_OUTPUTS),
+        "semantic-release-candidate.yml": (SHARED_CANDIDATE_INPUTS, SHARED_CANDIDATE_OUTPUTS),
+    }
+    calls = {(match.group("file"), match.group("ref")) for match in guideline_calls().values()}
+    assert {file for file, _ in calls} == set(interfaces)
+    for file, ref in calls:
+        url = f"https://raw.githubusercontent.com/{REPO}/{ref}/.github/workflows/{file}"
+        with urllib.request.urlopen(url, timeout=30) as response:
+            shared = response.read().decode()
+        inputs, outputs = interfaces[file]
+        assert _workflow_call_keys(shared, "inputs") == inputs
+        assert _workflow_call_keys(shared, "outputs") == outputs
