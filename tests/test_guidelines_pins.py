@@ -27,9 +27,25 @@ USES = re.compile(
 )
 PRESET = re.compile(rf"^github>{REPO}:renovate-preset#(?P<ref>.+)$")
 SHARED_RELEASE_INPUTS = {"dry-run", "draft-release", "expected-version", "expected-commit"}
-SHARED_RELEASE_OUTPUTS = {"draft-created", "published", "version", "git-tag", "release-url", "commit"}
+SHARED_RELEASE_OUTPUTS = {
+    "draft-created",
+    "published",
+    "version",
+    "git-tag",
+    "release-url",
+    "commit",
+}
 SHARED_CANDIDATE_INPUTS = {"replay-tag"}
-SHARED_CANDIDATE_OUTPUTS = {"semver-version", "pep440-version", "debian-version", "version", "git-tag", "commit", "run-id", "run-attempt"}
+SHARED_CANDIDATE_OUTPUTS = {
+    "semver-version",
+    "pep440-version",
+    "debian-version",
+    "version",
+    "git-tag",
+    "commit",
+    "run-id",
+    "run-attempt",
+}
 
 
 def _root() -> Path:
@@ -176,10 +192,16 @@ def test_an_unknown_release_output_is_reported():
     workflow_path() is None, reason="this repository has no guidelines workflow call"
 )
 def test_recorded_interface_matches_the_pinned_shared_workflow():
-    refs = {match.group("ref") for match in guideline_calls().values()}
-    (ref,) = refs
-    url = f"https://raw.githubusercontent.com/{REPO}/{ref}/.github/workflows/semantic-release.yml"
-    with urllib.request.urlopen(url, timeout=30) as response:
-        shared = response.read().decode()
-    assert _workflow_call_keys(shared, "inputs") == SHARED_RELEASE_INPUTS
-    assert _workflow_call_keys(shared, "outputs") == SHARED_RELEASE_OUTPUTS
+    interfaces = {
+        "semantic-release.yml": (SHARED_RELEASE_INPUTS, SHARED_RELEASE_OUTPUTS),
+        "semantic-release-candidate.yml": (SHARED_CANDIDATE_INPUTS, SHARED_CANDIDATE_OUTPUTS),
+    }
+    calls = {(match.group("file"), match.group("ref")) for match in guideline_calls().values()}
+    assert {file for file, _ in calls} == set(interfaces)
+    for file, ref in calls:
+        url = f"https://raw.githubusercontent.com/{REPO}/{ref}/.github/workflows/{file}"
+        with urllib.request.urlopen(url, timeout=30) as response:
+            shared = response.read().decode()
+        inputs, outputs = interfaces[file]
+        assert _workflow_call_keys(shared, "inputs") == inputs
+        assert _workflow_call_keys(shared, "outputs") == outputs

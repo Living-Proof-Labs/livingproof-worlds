@@ -1,50 +1,63 @@
 # SPDX-License-Identifier: Apache-2.0
 name: Repository manual
 on:
-  pull_request:
   workflow_call:
     inputs:
-      release_tag:
+      version:
         required: true
         type: string
-      release_version:
+      commit:
         required: true
         type: string
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Existing release tag (vX.Y.Z) to build and deploy
-        required: false
+      plan-run:
+        required: true
         type: string
-        default: ''
+      plan-attempt:
+        required: true
+        type: string
+    outputs:
+      artifact-version:
+        value: ${{ jobs.build.outputs.artifact-version }}
+      artifact-commit:
+        value: ${{ jobs.build.outputs.artifact-commit }}
+      artifact-run-id:
+        value: ${{ jobs.build.outputs.artifact-run-id }}
+      artifact-attempt:
+        value: ${{ jobs.build.outputs.artifact-attempt }}
+      artifact-digest:
+        value: ${{ jobs.build.outputs.artifact-digest }}
 permissions:
   contents: read
 jobs:
-  version:
-    permissions:
-      contents: read
-    uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release-candidate.yml@v9.9.1
-    with:
-      replay-tag: ${{ inputs.release_tag || '' }}
   build:
-    needs: version
+    runs-on: ubuntu-24.04
     outputs:
       artifact-version: ${{ steps.seal.outputs.version }}
       artifact-commit: ${{ steps.seal.outputs.commit }}
       artifact-run-id: ${{ steps.seal.outputs.run-id }}
       artifact-attempt: ${{ steps.seal.outputs.attempt }}
-    runs-on: ubuntu-24.04
+      artifact-digest: ${{ steps.seal.outputs.digest }}
     env:
-      RELEASE_TAG: ${{ inputs.release_tag }}
-      RELEASE_VERSION: ${{ inputs.release_version || needs.version.outputs.semver-version }}
-      CANDIDATE_COMMIT: ${{ needs.version.outputs.commit }}
+      SOURCE_COMMIT: ${{ inputs.commit }}
+      MANUAL_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-          fetch-tags: true
           persist-credentials: false
+      - name: Require the exact shared version plan for this attempt
+        env:
+          PLAN_RUN: ${{ inputs.plan-run }}
+          PLAN_ATTEMPT: ${{ inputs.plan-attempt }}
+          EVENT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test -n "$MANUAL_VERSION"
+          test -n "$SOURCE_COMMIT"
+          test "$SOURCE_COMMIT" = "$EVENT_COMMIT"
+          test "$SOURCE_COMMIT" = "$(git rev-parse HEAD)"
+          test "$PLAN_RUN" = "$GITHUB_RUN_ID"
+          test "$PLAN_ATTEMPT" = "$GITHUB_RUN_ATTEMPT"
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e
         with:
           version: '3.54.0'
@@ -55,17 +68,27 @@ jobs:
           echo "LOCAL_GID=$(id -g)" >> "$GITHUB_ENV"
       - run: task setup
       - run: task manual:verify
-      - name: Seal manual artifact identity
+      - name: Seal the verified manual bytes for this attempt
         id: seal
-        env:
-          EXPECTED_COMMIT: ${{ needs.version.outputs.commit }}
-          EXPECTED_VERSION: ${{ needs.version.outputs.semver-version }}
+        shell: bash
         run: |
-          test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT"
-          echo "version=$EXPECTED_VERSION" >> "$GITHUB_OUTPUT"
-          echo "commit=$EXPECTED_COMMIT" >> "$GITHUB_OUTPUT"
-          echo "run-id=$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          cd artifacts/manual/html
+          jq -e --arg commit "$SOURCE_COMMIT" --arg version "$MANUAL_VERSION" \
+            --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" '
+              .source_commit == $commit and .version == $version and .source_dirty == false and
+              .run_id == $run and .run_attempt == $attempt
+            ' build.json >/dev/null
+          test -f index.html
+          test -z "$(find . ! -type f ! -type d -print -quit)"
+          find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > ../site.sha256
+          {
+            echo "version=$MANUAL_VERSION"
+            echo "commit=$SOURCE_COMMIT"
+            echo "run-id=$GITHUB_RUN_ID"
+            echo "attempt=$GITHUB_RUN_ATTEMPT"
+            echo "digest=$(sha256sum ../site.sha256 | cut -d' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
       - name: Publish individual manual checks
         id: tests
         if: ${{ !cancelled() }}
@@ -83,8 +106,9 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: repository-manual-${{ github.run_attempt }}
+          name: repository-manual-${{ inputs.version }}-${{ inputs.commit }}-${{ github.run_attempt }}
           path: artifacts/manual/
+          include-hidden-files: true
           retention-days: 14
           if-no-files-found: error
       - name: Verify complete test publication
@@ -102,63 +126,3 @@ jobs:
           echo "Manual and diagnostics (14 days): $ARTIFACT_URL" >> "$GITHUB_STEP_SUMMARY"
           test "$emitted" -gt 0
           test "$emitted" -eq "$ingested"
-  deploy:
-    needs: [version, build]
-    if: >-
-      !cancelled() && github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/main' &&
-      inputs.release_tag != '' &&
-      needs.version.result == 'success' && needs.build.result == 'success' &&
-      needs.build.outputs.artifact-run-id == github.run_id &&
-      needs.build.outputs.artifact-attempt == github.run_attempt
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    concurrency:
-      group: worlds-pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Require current main inside deployment lock
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CANDIDATE: ${{ needs.build.outputs.artifact-commit }}
-        run: |
-          current=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)
-          test "$current" = "$CANDIDATE"
-      - name: Require exact release tag inside deployment lock
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CANDIDATE: ${{ needs.build.outputs.artifact-commit }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-          EXPECTED_VERSION: ${{ inputs.release_version || needs.build.outputs.artifact-version }}
-          ARTIFACT_VERSION: ${{ needs.build.outputs.artifact-version }}
-        run: |
-          set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
-          test "${RELEASE_TAG#v}" = "$ARTIFACT_VERSION"
-          test "$EXPECTED_VERSION" = "$ARTIFACT_VERSION"
-          tagged=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq .object.sha)
-          test "$tagged" = "$CANDIDATE"
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: repository-manual-${{ github.run_attempt }}
-          path: verified-manual
-      - name: Package verified manual for Pages
-        run: |
-          tar --dereference --hard-dereference -C verified-manual/html -cf "$RUNNER_TEMP/artifact.tar" .
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: github-pages-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/artifact.tar
-          retention-days: 1
-          if-no-files-found: error
-      - name: Deploy verified manual
-        id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
-        with:
-          artifact_name: github-pages-${{ github.run_attempt }}

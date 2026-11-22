@@ -4,10 +4,17 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing published release tag (vX.Y.Z) for exact-current-main delivery retry
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
   verify:
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -49,31 +56,133 @@ jobs:
       contents: read
     uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release-candidate.yml@v9.9.1
     with:
-      replay-tag: ''
+      replay-tag: ${{ inputs.release_tag || '' }}
+  manual:
+    needs: version
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+      (github.ref == 'refs/heads/main' &&
+       (github.event_name == 'push' || github.event_name == 'workflow_dispatch'))
+    permissions:
+      contents: read
+    uses: ./.github/workflows/manual.yml
+    with:
+      version: ${{ needs.version.outputs.semver-version }}
+      commit: ${{ needs.version.outputs.commit }}
+      plan-run: ${{ needs.version.outputs.run-id }}
+      plan-attempt: ${{ needs.version.outputs.run-attempt }}
   release:
-    needs: [verify, version]
+    needs: [verify, version, manual]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.version.outputs.git-tag != '' &&
-      needs.version.outputs.version == needs.version.outputs.semver-version &&
-      needs.version.outputs.commit == github.sha
+      needs.version.outputs.version == needs.manual.outputs.artifact-version &&
+      needs.manual.outputs.artifact-commit == github.sha &&
+      needs.manual.outputs.artifact-run-id == github.run_id &&
+      needs.manual.outputs.artifact-attempt == github.run_attempt &&
+      needs.manual.outputs.artifact-digest != ''
     permissions:
       contents: write
     uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release.yml@v9.9.1
     with:
-      expected-version: ${{ needs.version.outputs.semver-version }}
-      expected-commit: ${{ needs.version.outputs.commit }}
-  deploy-manual:
-    needs: [release, version]
+      expected-version: ${{ needs.manual.outputs.artifact-version }}
+      expected-commit: ${{ needs.manual.outputs.artifact-commit }}
+  deploy:
+    needs: [version, manual, release]
     if: >-
-      needs.release.result == 'success' &&
-      needs.release.outputs.published == 'true' &&
-      needs.release.outputs.commit == needs.version.outputs.commit
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.version.result == 'success' && needs.manual.result == 'success' &&
+      needs.manual.outputs.artifact-commit == github.sha &&
+      needs.manual.outputs.artifact-run-id == github.run_id &&
+      needs.manual.outputs.artifact-attempt == github.run_attempt &&
+      needs.manual.outputs.artifact-digest != '' &&
+      ((github.event_name == 'push' && needs.release.result == 'success' &&
+        needs.release.outputs.published == 'true' &&
+        needs.release.outputs.version == needs.manual.outputs.artifact-version &&
+        needs.release.outputs.commit == needs.manual.outputs.artifact-commit) ||
+       (github.event_name == 'workflow_dispatch' && inputs.release_tag != '' &&
+        needs.release.result == 'skipped'))
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pages: write
       id-token: write
-    uses: ./.github/workflows/manual.yml
-    with:
-      release_tag: ${{ needs.release.outputs.git-tag }}
-      release_version: ${{ needs.release.outputs.version }}
+    concurrency:
+      group: worlds-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      CANDIDATE: ${{ needs.manual.outputs.artifact-commit }}
+      VERSION: ${{ needs.manual.outputs.artifact-version }}
+      DIGEST: ${{ needs.manual.outputs.artifact-digest }}
+      RELEASE_TAG: ${{ needs.release.outputs.git-tag || inputs.release_tag }}
+    steps:
+      - name: Require current main inside deployment lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ needs.manual.outputs.artifact-commit }}
+        run: |
+          current=$(gh api repos/Living-Proof-Labs/livingproof-worlds/git/ref/heads/main --jq .object.sha)
+          test "$current" = "$CANDIDATE"
+      - name: Independently require the published stable release at the exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          test "$RELEASE_TAG" = "v$VERSION"
+          [[ "$CANDIDATE" =~ ^[0-9a-f]{40}$ ]]
+          test "$CANDIDATE" = "$GITHUB_SHA"
+          export GIT_TERMINAL_PROMPT=0
+          ref="refs/tags/$RELEASE_TAG"
+          tags=$(timeout 30s git -c credential.helper= ls-remote --exit-code \
+            https://github.com/Living-Proof-Labs/livingproof-worlds.git "$ref" "$ref^{}")
+          mapfile -t refs <<< "$tags"
+          if [[ ${#refs[@]} == 2 ]]; then
+            [[ "${refs[0]%$'\t'*}" =~ ^[0-9a-f]{40}$ ]]
+            test "${refs[0]#*$'\t'}" = "$ref"
+            test "${refs[1]}" = "$CANDIDATE"$'\t'"$ref^{}"
+          else
+            test "${#refs[@]}" = 1
+            test "${refs[0]}" = "$CANDIDATE"$'\t'"$ref"
+          fi
+          gh api "repos/Living-Proof-Labs/livingproof-worlds/releases/tags/$RELEASE_TAG" | \
+            jq -e --arg tag "$RELEASE_TAG" '
+              .tag_name == $tag and .draft == false and .prerelease == false and
+              (.published_at | type == "string" and length > 0)
+            ' >/dev/null
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: repository-manual-${{ needs.manual.outputs.artifact-version }}-${{ needs.manual.outputs.artifact-commit }}-${{ github.run_attempt }}
+          path: verified-manual
+      - name: Verify transport and package only the sealed HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd verified-manual/html
+          [[ "$DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          test "$(sha256sum ../site.sha256 | cut -d' ' -f1)" = "$DIGEST"
+          test -f index.html
+          test -z "$(find . ! -type f ! -type d -print -quit)"
+          find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/manual.sha256"
+          cmp ../site.sha256 "$RUNNER_TEMP/manual.sha256"
+          jq -e --arg commit "$CANDIDATE" --arg version "$VERSION" \
+            --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" '
+              .source_commit == $commit and .version == $version and .source_dirty == false and
+              .run_id == $run and .run_attempt == $attempt
+            ' build.json >/dev/null
+          tar --dereference --hard-dereference -cf "$RUNNER_TEMP/artifact.tar" .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: github-pages-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+      - name: Deploy verified manual
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
