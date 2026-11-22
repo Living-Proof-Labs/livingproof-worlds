@@ -159,6 +159,7 @@ jobs:
           name: repository-manual-${{ needs.manual.outputs.artifact-version }}-${{ needs.manual.outputs.artifact-commit }}-${{ github.run_attempt }}
           path: verified-manual
       - name: Verify transport and package only the sealed HTML
+        id: pages-package
         shell: bash
         run: |
           set -euo pipefail
@@ -175,12 +176,74 @@ jobs:
               .run_id == $run and .run_attempt == $attempt
             ' build.json >/dev/null
           tar --dereference --hard-dereference -cf "$RUNNER_TEMP/artifact.tar" .
+          digest=$(sha256sum "$RUNNER_TEMP/artifact.tar")
+          echo "tar-sha256=${digest%% *}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        id: pages-artifact
         with:
           name: github-pages-${{ github.run_attempt }}
           path: ${{ runner.temp }}/artifact.tar
           retention-days: 1
           if-no-files-found: error
+      # Use the same-run Actions artifact client (like deploy-pages), not the REST index.
+      # An exact ID and name must both resolve to the sealed Pages tar before deploying.
+      - name: Require a valid Pages artifact ID
+        shell: bash
+        env:
+          UPLOADED_ID: ${{ steps.pages-artifact.outputs.artifact-id }}
+        run: |
+          [[ "$UPLOADED_ID" =~ ^[1-9][0-9]*$ ]]
+      - name: Read exact Pages artifact by ID
+        id: pages-id-first
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.pages-artifact.outputs.artifact-id }}
+          path: ${{ runner.temp }}/worlds-pages-id-first
+      - name: Allow the ID lookup to settle
+        if: steps.pages-id-first.outcome == 'failure'
+        run: sleep 4
+      - name: Retry read by ID once
+        id: pages-id-retry
+        if: steps.pages-id-first.outcome == 'failure'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.pages-artifact.outputs.artifact-id }}
+          path: ${{ runner.temp }}/worlds-pages-id-retry
+      - name: Read exact Pages artifact by name
+        id: pages-name-first
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: github-pages-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worlds-pages-name-first
+      - name: Allow the name lookup to settle
+        if: steps.pages-name-first.outcome == 'failure'
+        run: sleep 4
+      - name: Retry read by name once
+        id: pages-name-retry
+        if: steps.pages-name-first.outcome == 'failure'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: github-pages-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/worlds-pages-name-retry
+      - name: Require matching ID and name readback of the exact tar
+        shell: bash
+        env:
+          EXPECTED_TAR: ${{ steps.pages-package.outputs.tar-sha256 }}
+          EXPECTED_NAME: github-pages-${{ github.run_attempt }}
+          ID_READBACK: ${{ steps.pages-id-first.outcome == 'success' && steps.pages-id-first.outputs.download-path || steps.pages-id-retry.outputs.download-path }}
+          NAME_READBACK: ${{ steps.pages-name-first.outcome == 'success' && steps.pages-name-first.outputs.download-path || steps.pages-name-retry.outputs.download-path }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_TAR" =~ ^[0-9a-f]{64}$ ]]
+          test -n "$ID_READBACK"
+          test -n "$NAME_READBACK"
+          for path in "$ID_READBACK/$EXPECTED_NAME" "$NAME_READBACK"; do
+            test -f "$path/artifact.tar"
+            digest=$(sha256sum "$path/artifact.tar")
+            test "${digest%% *}" = "$EXPECTED_TAR"
+          done
       - name: Deploy verified manual
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e

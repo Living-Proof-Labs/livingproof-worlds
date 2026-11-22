@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Exercise the released manual's workflow guards without contacting GitHub."""
 
+import hashlib
 import json
 import os
 import shutil
@@ -210,14 +211,70 @@ def test_seal_then_check_transported_bytes(tmp_path, kind):
         GITHUB_RUN_ID=RUN,
         GITHUB_RUN_ATTEMPT="3" if kind == "stale-attempt" else ATTEMPT,
         RUNNER_TEMP=str(tmp_path),
+        GITHUB_OUTPUT=str(tmp_path / "package-outputs"),
         DIGEST="0" * 64 if kind == "other-digest" else recorded["digest"],
     )
     assert (transport.returncode == 0) == (kind == "verified"), transport
     if kind == "verified":
-        with tarfile.open(tmp_path / "artifact.tar") as package:
+        artifact = tmp_path / "artifact.tar"
+        assert (tmp_path / "package-outputs").read_text() == (
+            "tar-sha256=" + hashlib.sha256(artifact.read_bytes()).hexdigest() + "\n"
+        )
+        with tarfile.open(artifact) as package:
             assert sorted(package.getnames()) == [
                 ".",
                 "./.nojekyll",
                 "./build.json",
                 "./index.html",
             ]
+
+
+def test_pages_artifact_readback_checks_both_runtime_routes_with_bounded_retries():
+    deploy = workflow("verify")["jobs"]["deploy"]
+    assert deploy["permissions"] == {"contents": "read", "pages": "write", "id-token": "write"}
+    steps = deploy["steps"]
+    assert steps[-1]["name"] == "Deploy verified manual"
+    assert steps[-2]["name"] == "Require matching ID and name readback of the exact tar"
+    upload = next(step for step in steps if step.get("id") == "pages-artifact")
+    assert steps[-1]["with"]["artifact_name"] == upload["with"]["name"]
+    assert _step("verify", "deploy", "Require a valid Pages artifact ID") in steps
+    for route, selector, expected in [
+        ("id", "artifact-ids", "${{ steps.pages-artifact.outputs.artifact-id }}"),
+        ("name", "name", upload["with"]["name"]),
+    ]:
+        first = next(step for step in steps if step.get("id") == f"pages-{route}-first")
+        retry = next(step for step in steps if step.get("id") == f"pages-{route}-retry")
+        assert first["continue-on-error"] == "true"
+        assert retry["if"] == f"steps.pages-{route}-first.outcome == 'failure'"
+        assert "continue-on-error" not in retry
+        assert first["uses"] == retry["uses"] and "download-artifact@" in retry["uses"]
+        for step in (first, retry):
+            assert set(step["with"]) == {selector, "path"}
+            assert step["with"][selector] == expected
+        assert first["with"]["path"] != retry["with"]["path"]
+        source = steps[-2]["env"][f"{route.upper()}_READBACK"]
+        assert f"steps.pages-{route}-first.outcome == 'success'" in source
+        assert f"steps.pages-{route}-retry.outputs.download-path" in source
+
+
+@pytest.mark.parametrize(
+    "kind", ["both-exact", "missing", "wrong-id-bytes", "wrong-name-bytes", "name-mismatch"]
+)
+def test_pages_artifact_runtime_readback_rejects_mismatched_bytes(tmp_path, kind):
+    identifier, named = tmp_path / "id", tmp_path / "name"
+    expected_name = "github-pages-2"
+    id_location = identifier / ("github-pages-1" if kind == "name-mismatch" else expected_name)
+    id_location.mkdir(parents=True)
+    named.mkdir()
+    (id_location / "artifact.tar").write_bytes(b"wrong" if kind == "wrong-id-bytes" else b"sealed")
+    if kind != "missing":
+        (named / "artifact.tar").write_bytes(b"wrong" if kind == "wrong-name-bytes" else b"sealed")
+    result = _run(
+        _step("verify", "deploy", "Require matching ID and name readback of the exact tar"),
+        tmp_path,
+        ID_READBACK=str(identifier),
+        NAME_READBACK=str(named),
+        EXPECTED_TAR=hashlib.sha256(b"sealed").hexdigest(),
+        EXPECTED_NAME=expected_name,
+    )
+    assert (result.returncode == 0) == (kind == "both-exact"), result
