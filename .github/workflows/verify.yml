@@ -44,15 +44,31 @@ jobs:
           path: artifacts/
           retention-days: 14
           if-no-files-found: error
+  version:
+    permissions:
+      contents: read
+    uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release-candidate.yml@v9.9.1
+    with:
+      replay-tag: ''
   release:
-    needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify, version]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.version.outputs.git-tag != '' &&
+      needs.version.outputs.version == needs.version.outputs.semver-version &&
+      needs.version.outputs.commit == github.sha
     permissions:
       contents: write
-    uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release.yml@v9.7.9
+    uses: Living-Proof-Labs/collaboration-guidelines/.github/workflows/semantic-release.yml@v9.9.1
+    with:
+      expected-version: ${{ needs.version.outputs.semver-version }}
+      expected-commit: ${{ needs.version.outputs.commit }}
   deploy-manual:
-    needs: release
-    if: needs.release.outputs.published == 'true'
+    needs: [release, version]
+    if: >-
+      needs.release.result == 'success' &&
+      needs.release.outputs.published == 'true' &&
+      needs.release.outputs.commit == needs.version.outputs.commit
     permissions:
       contents: read
       pages: write

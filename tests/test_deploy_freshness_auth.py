@@ -379,7 +379,8 @@ def _deploy_guard() -> tuple[str, dict[str, str], list[str]]:
             env[entry["name"]] = "workflow-token"
         elif entry["name"] == "CANDIDATE":
             env[entry["name"]] = EXPECTED_SHA
-    return script, env, steps[1]
+    deploy_step = next(step for step in steps if "actions/deploy-pages@" in "\n".join(step))
+    return script, env, deploy_step
 
 
 def _run_guard(
